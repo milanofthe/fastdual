@@ -4,6 +4,17 @@
 #include <math.h>
 #include <string.h>
 
+/* Python 3.10/3.11 compat — these were added in 3.12 */
+#ifndef Py_T_DOUBLE
+#define Py_T_DOUBLE T_DOUBLE
+#endif
+#ifndef Py_T_INT
+#define Py_T_INT T_INT
+#endif
+#ifndef Py_READONLY
+#define Py_READONLY READONLY
+#endif
+
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 
