@@ -232,6 +232,16 @@ static int as_double(PyObject *obj, double *out) {
         if (*out == -1.0 && PyErr_Occurred()) return 0;
         return 1;
     }
+    /* numpy scalars, 0-d arrays, 1-element arrays via __float__ */
+    {
+        PyObject *flt = PyNumber_Float(obj);
+        if (flt) {
+            *out = PyFloat_AS_DOUBLE(flt);
+            Py_DECREF(flt);
+            return 1;
+        }
+        PyErr_Clear();
+    }
     return 0;
 }
 
