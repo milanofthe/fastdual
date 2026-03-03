@@ -1,5 +1,5 @@
 """
-Overhead benchmark: dualnum vs plain floats vs numpy
+Overhead benchmark: fastdual vs plain floats vs numpy
 
 Measures the cost of carrying gradients compared to raw numeric computation.
 
@@ -12,7 +12,7 @@ import math
 import numpy as np
 
 sys.path.insert(0, "src")
-from dualnum import Dual, der, jac, seed_array, val, reset, autojac
+from fastdual import Dual, der, jac, seed_array, val, reset, autojac
 
 
 # -- Benchmark harness --------------------------------------------------------

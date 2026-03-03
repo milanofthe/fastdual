@@ -1,6 +1,6 @@
 import pytest
 import math
-from dualnum import Dual, reset
+from fastdual import Dual, reset
 
 
 @pytest.fixture(autouse=True)

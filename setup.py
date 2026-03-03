@@ -15,8 +15,8 @@ from setuptools import setup, Extension
 setup(
     ext_modules=[
         Extension(
-            "dualnum._dualnum",
-            sources=["src/dualnum/_dualnum.c"],
+            "fastdual._fastdual",
+            sources=["src/fastdual/_fastdual.c"],
             include_dirs=[np.get_include()],
         )
     ],

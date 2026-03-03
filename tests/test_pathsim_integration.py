@@ -1,7 +1,7 @@
 """
-Integration tests: dualnum vs pathsim's numerical differentiation.
+Integration tests: fastdual vs pathsim's numerical differentiation.
 
-Compares exact dualnum Jacobians against pathsim's finite-difference
+Compares exact fastdual Jacobians against pathsim's finite-difference
 Jacobians on the same dynamical systems pathsim simulates (Van der Pol,
 Lorenz, harmonic oscillator, etc.)
 
@@ -12,7 +12,7 @@ import pytest
 import math
 import numpy as np
 
-from dualnum import Dual, seed_array, val, jac, der, autojac, reset
+from fastdual import Dual, seed_array, val, jac, der, autojac, reset
 
 # Try importing pathsim's numerical differentiation
 pathsim = pytest.importorskip("pathsim")
@@ -24,10 +24,10 @@ def _reset():
     reset()
 
 
-# -- Helper: dualnum jacobian matching pathsim's signature --
+# -- Helper: fastdual jacobian matching pathsim's signature --
 
 def dual_jac(func, x):
-    """Compute Jacobian of func at x using dualnum.
+    """Compute Jacobian of func at x using fastdual.
 
     Matches the signature of pathsim's num_jac(func, x).
     """
@@ -67,7 +67,7 @@ class TestHarmonicOscillator:
         wn, zeta = 2.0, 0.5
         return np.array([[0.0, 1.0], [-wn**2, -2*zeta*wn]])
 
-    def test_dualnum_matches_analytical(self):
+    def test_fastdual_matches_analytical(self):
         x0 = np.array([1.0, 0.0])
         J_dual = dual_jac(self.f, x0)
         J_exact = self.analytical_jac(x0)
@@ -80,7 +80,7 @@ class TestHarmonicOscillator:
         J_exact = self.analytical_jac(x0)
         np.testing.assert_allclose(J_num, J_exact, rtol=1e-6)
 
-    def test_dualnum_more_accurate_than_pathsim(self):
+    def test_fastdual_more_accurate_than_pathsim(self):
         x0 = np.array([1.0, 0.5])
         J_exact = self.analytical_jac(x0)
         J_dual = dual_jac(self.f, x0)
@@ -89,9 +89,9 @@ class TestHarmonicOscillator:
         err_dual = np.max(np.abs(J_dual - J_exact))
         err_num = np.max(np.abs(J_num - J_exact))
 
-        # dualnum should be exact (machine precision)
+        # fastdual should be exact (machine precision)
         assert err_dual < 1e-14
-        # dualnum should be at least as good as finite diff
+        # fastdual should be at least as good as finite diff
         assert err_dual <= err_num
 
 
@@ -113,13 +113,13 @@ class TestVanDerPol:
             [-2*mu*x[0]*x[1] - 1, mu*(1 - x[0]**2)]
         ])
 
-    def test_dualnum_matches_analytical(self):
+    def test_fastdual_matches_analytical(self):
         for x0 in [np.array([2.0, 0.0]), np.array([0.5, -1.0]), np.array([1.0, 1.0])]:
             J_dual = dual_jac(self.f, x0)
             J_exact = self.analytical_jac(x0)
             np.testing.assert_allclose(J_dual, J_exact, atol=1e-13)
 
-    def test_dualnum_vs_pathsim(self):
+    def test_fastdual_vs_pathsim(self):
         x0 = np.array([2.0, 0.0])
         J_exact = self.analytical_jac(x0)
         J_dual = dual_jac(self.f, x0)
@@ -179,7 +179,7 @@ class TestLorenz:
             [x[1],   x[0], -b]
         ])
 
-    def test_dualnum_matches_analytical(self):
+    def test_fastdual_matches_analytical(self):
         x0 = np.array([1.0, 1.0, 1.0])
         J_dual = dual_jac(self.f, x0)
         J_exact = self.analytical_jac(x0)
@@ -192,7 +192,7 @@ class TestLorenz:
         J_exact = self.analytical_jac(x0)
         np.testing.assert_allclose(J_dual, J_exact, atol=1e-12)
 
-    def test_dualnum_vs_pathsim(self):
+    def test_fastdual_vs_pathsim(self):
         x0 = np.array([-6.0, -10.0, 22.0])
         J_exact = self.analytical_jac(x0)
         J_dual = dual_jac(self.f, x0)
@@ -230,7 +230,7 @@ class TestRobertsonStiff:
             [ 0.0,        6e7*x[1],        0.0]
         ])
 
-    def test_dualnum_matches_analytical(self):
+    def test_fastdual_matches_analytical(self):
         x0 = np.array([1.0, 0.0, 0.0])
         J_dual = dual_jac(self.f, x0)
         J_exact = self.analytical_jac(x0)
@@ -253,7 +253,7 @@ class TestRobertsonStiff:
         err_dual = np.max(np.abs(J_dual - J_exact) / (np.abs(J_exact) + 1e-20))
         err_num = np.max(np.abs(J_num - J_exact) / (np.abs(J_exact) + 1e-20))
 
-        # dualnum should be many orders of magnitude better
+        # fastdual should be many orders of magnitude better
         assert err_dual < 1e-10
         assert err_dual < err_num
 
@@ -301,7 +301,7 @@ class TestAutojacWrapper:
         # Both should agree to at least finite-diff accuracy
         np.testing.assert_allclose(J_dual, J_num, rtol=1e-5)
 
-        # But dualnum should be exact
+        # But fastdual should be exact
         J_exact = np.array([
             [math.cos(1.0)*2.0, math.sin(1.0)],
             [-math.exp(-1.0),   4.0]
@@ -368,7 +368,7 @@ class TestScalarSystems:
 
 
 class TestPerformance:
-    """Benchmark dualnum vs finite diff Jacobians."""
+    """Benchmark fastdual vs finite diff Jacobians."""
 
     def test_10x10_system(self):
         """10-variable coupled system — realistic size for pathsim."""

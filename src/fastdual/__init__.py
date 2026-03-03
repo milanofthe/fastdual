@@ -1,10 +1,10 @@
-from ._dualnum import Dual, reset
-from ._dualnum import seed_array as _c_seed_array
-from ._dualnum import val_array as _c_val_array
-from ._dualnum import der_array as _c_der_array
-from ._dualnum import jac_matrix as _c_jac_matrix
-from ._dualnum import apply_unary_array as _c_apply_unary
-from ._dualnum import apply_binary_array as _c_apply_binary
+from ._fastdual import Dual, reset
+from ._fastdual import seed_array as _c_seed_array
+from ._fastdual import val_array as _c_val_array
+from ._fastdual import der_array as _c_der_array
+from ._fastdual import jac_matrix as _c_jac_matrix
+from ._fastdual import apply_unary_array as _c_apply_unary
+from ._fastdual import apply_binary_array as _c_apply_binary
 import functools
 import numpy as np
 

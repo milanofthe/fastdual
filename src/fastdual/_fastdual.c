@@ -1028,7 +1028,7 @@ static PyNumberMethods Dual_as_number = {
 
 static PyTypeObject PyDual_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name      = "dualnum._dualnum.Dual",
+    .tp_name      = "fastdual._fastdual.Dual",
     .tp_basicsize = sizeof(PyDualObject),
     .tp_flags     = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_doc       = "Dual number for forward-mode automatic differentiation",
@@ -1526,15 +1526,15 @@ static PyModuleDef_Slot module_slots[] = {
     {0, NULL}
 };
 
-static struct PyModuleDef dualnum_module = {
+static struct PyModuleDef fastdual_module = {
     PyModuleDef_HEAD_INIT,
-    .m_name    = "_dualnum",
+    .m_name    = "_fastdual",
     .m_doc     = "C extension for dual number automatic differentiation",
     .m_size    = 0,
     .m_methods = module_methods,
     .m_slots   = module_slots,
 };
 
-PyMODINIT_FUNC PyInit__dualnum(void) {
-    return PyModuleDef_Init(&dualnum_module);
+PyMODINIT_FUNC PyInit__fastdual(void) {
+    return PyModuleDef_Init(&fastdual_module);
 }

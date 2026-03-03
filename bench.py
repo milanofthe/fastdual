@@ -1,5 +1,5 @@
 """
-Comprehensive benchmark: dualnum (C extension) vs original Value (pure Python)
+Comprehensive benchmark: fastdual (C extension) vs original Value (pure Python)
 
 Run: python bench.py
 """
@@ -10,10 +10,10 @@ import numpy as np
 
 # -- Import both implementations ---------------------------------------------
 
-# Add src to path for dualnum
+# Add src to path for fastdual
 sys.path.insert(0, "src")
 
-from dualnum import Dual, der, jac, seed_array, val, reset, autojac
+from fastdual import Dual, der, jac, seed_array, val, reset, autojac
 
 # Import original Value (standalone copy from pathsim)
 sys.path.insert(0, ".")

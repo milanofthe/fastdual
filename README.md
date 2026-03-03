@@ -1,4 +1,4 @@
-# dualnum
+# fastdual
 
 Fast forward-mode automatic differentiation via dual numbers, implemented as a CPython C extension.
 
@@ -7,13 +7,19 @@ Computes exact gradients and Jacobians with minimal overhead — no taping, no g
 ## Install
 
 ```bash
+pip install fastdual
+```
+
+For development:
+
+```bash
 pip install -e .[test]
 ```
 
 ## Quick Start
 
 ```python
-from dualnum import Dual, der
+from fastdual import Dual, der
 import numpy as np
 
 # Create independent variables
@@ -30,7 +36,7 @@ print(der(z, y))    # 3.0  (dz/dy = x)
 ## Array Operations
 
 ```python
-from dualnum import seed_array, val, jac
+from fastdual import seed_array, val, jac
 import numpy as np
 
 # Create array of independent seeds
@@ -50,7 +56,7 @@ print(jac(result, xs))
 ## Automatic Jacobians
 
 ```python
-from dualnum import autojac
+from fastdual import autojac
 import numpy as np
 
 @autojac

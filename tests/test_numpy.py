@@ -1,7 +1,7 @@
 import pytest
 import math
 import numpy as np
-from dualnum import Dual, DualArray, der, seed_array, val, reset, autojac
+from fastdual import Dual, DualArray, der, seed_array, val, reset, autojac
 
 
 @pytest.fixture(autouse=True)
@@ -435,7 +435,7 @@ class TestDualArrayFallback:
     def test_unsupported_ufunc_falls_back(self):
         arr = seed_array([1.0, 2.0])
         # np.positive should go through C path, but np.spacing is not
-        # supported by dualnum; test that known ops still return DualArray
+        # supported by fastdual; test that known ops still return DualArray
         result = np.positive(arr)
         assert isinstance(result, DualArray)
 
@@ -445,7 +445,7 @@ class TestDualArrayFallback:
         np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
 
         result = np.sin(arr)
-        from dualnum import jac
+        from fastdual import jac
         J = jac(result, arr)
         expected = np.diag([math.cos(1.0), math.cos(2.0), math.cos(3.0)])
         np.testing.assert_allclose(J, expected)

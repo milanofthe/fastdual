@@ -1,6 +1,6 @@
 import pytest
 import math
-from dualnum import Dual, der, jac, seed_array, val, reset
+from fastdual import Dual, der, jac, seed_array, val, reset
 import numpy as np
 
 
