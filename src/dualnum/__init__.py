@@ -3,8 +3,52 @@ from ._dualnum import seed_array as _c_seed_array
 from ._dualnum import val_array as _c_val_array
 from ._dualnum import der_array as _c_der_array
 from ._dualnum import jac_matrix as _c_jac_matrix
+from ._dualnum import apply_unary_array as _c_apply_unary
+from ._dualnum import apply_binary_array as _c_apply_binary
 import functools
 import numpy as np
+
+
+class DualArray(np.ndarray):
+    """ndarray subclass that intercepts ufuncs for C-level batch dispatch."""
+    __array_priority__ = 25.0
+
+    def __new__(cls, input_array):
+        return np.asarray(input_array, dtype=object).view(cls)
+
+    def __array_finalize__(self, obj):
+        pass
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if method != '__call__' or kwargs.get('out') is not None:
+            return self._fallback(ufunc, method, *inputs, **kwargs)
+
+        name = ufunc.__name__
+
+        if len(inputs) == 1:
+            arr = np.asarray(inputs[0])
+            result = _c_apply_unary(name, arr)
+            if result is not None:
+                return result.view(DualArray)
+
+        elif len(inputs) == 2:
+            lhs = np.asarray(inputs[0]) if isinstance(inputs[0], np.ndarray) else inputs[0]
+            rhs = np.asarray(inputs[1]) if isinstance(inputs[1], np.ndarray) else inputs[1]
+            result = _c_apply_binary(name, lhs, rhs)
+            if result is not None:
+                return result.view(DualArray)
+
+        return self._fallback(ufunc, method, *inputs, **kwargs)
+
+    def _fallback(self, ufunc, method, *inputs, **kwargs):
+        regular = tuple(
+            x.view(np.ndarray) if isinstance(x, DualArray) else x
+            for x in inputs
+        )
+        result = getattr(ufunc, method)(*regular, **kwargs)
+        if isinstance(result, np.ndarray) and result.dtype == object:
+            return result.view(DualArray)
+        return result
 
 
 def der(result, wrt):
@@ -31,7 +75,7 @@ def jac(results, seeds):
 
 def seed_array(values):
     """Create a numpy array of independent seed Duals from a list of floats."""
-    return np.array(_c_seed_array(list(values)), dtype=object)
+    return DualArray(_c_seed_array(list(values)))
 
 
 def val(arr):

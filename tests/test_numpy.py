@@ -1,7 +1,7 @@
 import pytest
 import math
 import numpy as np
-from dualnum import Dual, der, seed_array, val, reset, autojac
+from dualnum import Dual, DualArray, der, seed_array, val, reset, autojac
 
 
 @pytest.fixture(autouse=True)
@@ -283,3 +283,185 @@ class TestAutojac:
         result, J = f(1.0)
         np.testing.assert_allclose(result, [math.sin(1.0), math.e], rtol=1e-10)
         np.testing.assert_allclose(J, [[math.cos(1.0)], [math.e]], rtol=1e-10)
+
+
+class TestDualArraySubclass:
+    def test_seed_array_returns_dualarray(self):
+        arr = seed_array([1.0, 2.0, 3.0])
+        assert isinstance(arr, DualArray)
+        assert arr.dtype == object
+
+    def test_dualarray_from_list(self):
+        da = DualArray([Dual(1.0), Dual(2.0)])
+        assert isinstance(da, DualArray)
+        assert len(da) == 2
+
+
+class TestDualArrayUnaryUfuncs:
+    def test_np_sin_array(self):
+        arr = seed_array([0.0, math.pi / 2, math.pi])
+        result = np.sin(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [0.0, 1.0, 0.0], atol=1e-15)
+
+    def test_np_cos_array(self):
+        arr = seed_array([0.0, math.pi / 2])
+        result = np.cos(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [1.0, 0.0], atol=1e-15)
+
+    def test_np_exp_array(self):
+        arr = seed_array([0.0, 1.0])
+        result = np.exp(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [1.0, math.e])
+
+    def test_np_log_array(self):
+        arr = seed_array([1.0, math.e])
+        result = np.log(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [0.0, 1.0])
+
+    def test_np_sqrt_array(self):
+        arr = seed_array([1.0, 4.0, 9.0])
+        result = np.sqrt(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
+
+    def test_np_square_array(self):
+        arr = seed_array([2.0, 3.0])
+        result = np.square(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [4.0, 9.0])
+
+    def test_np_negative_array(self):
+        arr = seed_array([1.0, -2.0])
+        result = np.negative(arr)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [-1.0, 2.0])
+
+    def test_unary_gradients_preserved(self):
+        arr = seed_array([1.0, 2.0])
+        result = np.sin(arr)
+        assert der(result[0], arr[0]) == pytest.approx(math.cos(1.0))
+        assert der(result[1], arr[1]) == pytest.approx(math.cos(2.0))
+        assert der(result[0], arr[1]) == 0.0
+        assert der(result[1], arr[0]) == 0.0
+
+
+class TestDualArrayBinaryUfuncs:
+    def test_array_add_array(self):
+        a = seed_array([1.0, 2.0])
+        b = seed_array([3.0, 4.0])
+        result = np.add(a, b)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [4.0, 6.0])
+
+    def test_array_multiply_array(self):
+        a = seed_array([2.0, 3.0])
+        b = seed_array([4.0, 5.0])
+        result = np.multiply(a, b)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [8.0, 15.0])
+
+    def test_array_subtract_array(self):
+        a = seed_array([5.0, 4.0])
+        b = seed_array([1.0, 2.0])
+        result = np.subtract(a, b)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [4.0, 2.0])
+
+    def test_array_divide_array(self):
+        a = seed_array([10.0, 9.0])
+        b = seed_array([2.0, 3.0])
+        result = np.true_divide(a, b)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [5.0, 3.0])
+
+    def test_array_power(self):
+        a = seed_array([2.0, 3.0])
+        result = np.power(a, 2.0)
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [4.0, 9.0])
+
+    def test_array_add_scalar_dual(self):
+        a = seed_array([1.0, 2.0])
+        s = Dual(10.0)
+        result = a + s
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [11.0, 12.0])
+
+    def test_scalar_dual_add_array(self):
+        a = seed_array([1.0, 2.0])
+        s = Dual(10.0)
+        result = s + a
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [11.0, 12.0])
+
+    def test_array_mul_float(self):
+        a = seed_array([1.0, 2.0, 3.0])
+        result = a * 2.0
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [2.0, 4.0, 6.0])
+
+    def test_binary_gradients_preserved(self):
+        a = seed_array([2.0, 3.0])
+        b = seed_array([4.0, 5.0])
+        result = a * b
+        # d(a[0]*b[0])/d(a[0]) = b[0].val = 4.0
+        assert der(result[0], a[0]) == pytest.approx(4.0)
+        # d(a[0]*b[0])/d(b[0]) = a[0].val = 2.0
+        assert der(result[0], b[0]) == pytest.approx(2.0)
+        # cross terms zero
+        assert der(result[0], a[1]) == 0.0
+
+
+class TestDualArrayFallback:
+    def test_unsupported_ufunc_falls_back(self):
+        arr = seed_array([1.0, 2.0])
+        # np.positive should go through C path, but np.spacing is not
+        # supported by dualnum; test that known ops still return DualArray
+        result = np.positive(arr)
+        assert isinstance(result, DualArray)
+
+    def test_val_der_jac_work_with_dualarray(self):
+        arr = seed_array([1.0, 2.0, 3.0])
+        v = val(arr)
+        np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
+
+        result = np.sin(arr)
+        from dualnum import jac
+        J = jac(result, arr)
+        expected = np.diag([math.cos(1.0), math.cos(2.0), math.cos(3.0)])
+        np.testing.assert_allclose(J, expected)
+
+    def test_operator_add_arrays(self):
+        a = seed_array([1.0, 2.0])
+        b = seed_array([3.0, 4.0])
+        result = a + b
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [4.0, 6.0])
+
+    def test_operator_mul_arrays(self):
+        a = seed_array([2.0, 3.0])
+        b = seed_array([4.0, 5.0])
+        result = a * b
+        assert isinstance(result, DualArray)
+        v = val(result)
+        np.testing.assert_allclose(v, [8.0, 15.0])

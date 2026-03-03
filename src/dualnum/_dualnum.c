@@ -4,6 +4,9 @@
 #include <math.h>
 #include <string.h>
 
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+
 #ifdef _MSC_VER
 #include <intrin.h>
 #pragma intrinsic(_InterlockedIncrement)
@@ -939,18 +942,224 @@ static PyObject *mod_jac_matrix(PyObject *Py_UNUSED(self), PyObject *args) {
     return Py_BuildValue("(Onn)", result, nr, ns);
 }
 
+/* ======================================================================
+ * Array-level batch dispatch (for DualArray)
+ * ====================================================================== */
+
+typedef PyObject *(*unary_fn)(PyDualObject *, PyObject *);
+
+static PyObject *wrap_neg(PyDualObject *d, PyObject *ign) { return Dual_neg((PyObject *)d); }
+static PyObject *wrap_pos(PyDualObject *d, PyObject *ign) { return Dual_pos((PyObject *)d); }
+static PyObject *wrap_abs(PyDualObject *d, PyObject *ign) { return Dual_abs((PyObject *)d); }
+
+typedef struct { const char *name; unary_fn fn; } unary_entry;
+
+static const unary_entry unary_table[] = {
+    {"sin",       (unary_fn)Dual_sin},
+    {"cos",       (unary_fn)Dual_cos},
+    {"tan",       (unary_fn)Dual_tan},
+    {"exp",       (unary_fn)Dual_exp},
+    {"log",       (unary_fn)Dual_log},
+    {"log2",      (unary_fn)Dual_log2},
+    {"log10",     (unary_fn)Dual_log10},
+    {"sqrt",      (unary_fn)Dual_sqrt},
+    {"arcsin",    (unary_fn)Dual_arcsin},
+    {"arccos",    (unary_fn)Dual_arccos},
+    {"arctan",    (unary_fn)Dual_arctan},
+    {"sinh",      (unary_fn)Dual_sinh},
+    {"cosh",      (unary_fn)Dual_cosh},
+    {"tanh",      (unary_fn)Dual_tanh},
+    {"arcsinh",   (unary_fn)Dual_arcsinh},
+    {"arccosh",   (unary_fn)Dual_arccosh},
+    {"arctanh",   (unary_fn)Dual_arctanh},
+    {"exp2",      (unary_fn)Dual_exp2},
+    {"log1p",     (unary_fn)Dual_log1p},
+    {"expm1",     (unary_fn)Dual_expm1},
+    {"square",    (unary_fn)Dual_square},
+    {"cbrt",      (unary_fn)Dual_cbrt},
+    {"sign",      (unary_fn)Dual_sign},
+    {"absolute",  (unary_fn)wrap_abs},
+    {"negative",  (unary_fn)wrap_neg},
+    {"positive",  (unary_fn)wrap_pos},
+    {"conjugate", (unary_fn)Dual_conjugate},
+    {NULL, NULL}
+};
+
+/* apply_unary_array(name, arr) -> result_ndarray or None */
+static PyObject *mod_apply_unary_array(PyObject *Py_UNUSED(self), PyObject *args) {
+    const char *name;
+    PyObject *arr_obj;
+    if (!PyArg_ParseTuple(args, "sO", &name, &arr_obj)) return NULL;
+
+    unary_fn fn = NULL;
+    for (const unary_entry *e = unary_table; e->name; e++) {
+        if (strcmp(name, e->name) == 0) { fn = e->fn; break; }
+    }
+    if (!fn) Py_RETURN_NONE;
+
+    PyArrayObject *arr = (PyArrayObject *)PyArray_FROM_OTF(
+        arr_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+    if (!arr) return NULL;
+
+    npy_intp size = PyArray_SIZE(arr);
+    int ndim = PyArray_NDIM(arr);
+    npy_intp *shape = PyArray_DIMS(arr);
+
+    PyArrayObject *result = (PyArrayObject *)PyArray_SimpleNew(ndim, shape, NPY_OBJECT);
+    if (!result) { Py_DECREF(arr); return NULL; }
+
+    /* Contiguous object arrays: direct pointer access */
+    PyObject **src = (PyObject **)PyArray_DATA(arr);
+    PyObject **dst = (PyObject **)PyArray_DATA(result);
+
+    for (npy_intp i = 0; i < size; i++) {
+        if (!PyDual_Check(src[i])) {
+            PyErr_SetString(PyExc_TypeError, "array elements must be Dual");
+            Py_DECREF(arr); Py_DECREF(result);
+            return NULL;
+        }
+        PyObject *r = fn((PyDualObject *)src[i], NULL);
+        if (!r) { Py_DECREF(arr); Py_DECREF(result); return NULL; }
+        dst[i] = r;
+    }
+
+    Py_DECREF(arr);
+    return (PyObject *)result;
+}
+
+/* Binary dispatch */
+typedef PyObject *(*binary_fn)(PyObject *, PyObject *);
+
+typedef struct { const char *name; binary_fn fn; int is_pow; } binary_entry;
+
+static const binary_entry binary_table[] = {
+    {"add",         (binary_fn)Dual_add,     0},
+    {"subtract",    (binary_fn)Dual_sub,     0},
+    {"multiply",    (binary_fn)Dual_mul,     0},
+    {"true_divide", (binary_fn)Dual_truediv, 0},
+    {"divide",      (binary_fn)Dual_truediv, 0},
+    {"power",       NULL,                    1},
+    {NULL, NULL, 0}
+};
+
+/* apply_binary_array(name, lhs, rhs) -> result_ndarray or None */
+static PyObject *mod_apply_binary_array(PyObject *Py_UNUSED(self), PyObject *args) {
+    const char *name;
+    PyObject *lhs_obj, *rhs_obj;
+    if (!PyArg_ParseTuple(args, "sOO", &name, &lhs_obj, &rhs_obj)) return NULL;
+
+    binary_fn fn = NULL;
+    int is_pow = 0;
+    for (const binary_entry *e = binary_table; e->name; e++) {
+        if (strcmp(name, e->name) == 0) { fn = e->fn; is_pow = e->is_pow; break; }
+    }
+    if (!fn && !is_pow) Py_RETURN_NONE;
+
+    int lhs_is_arr = PyArray_Check(lhs_obj);
+    int rhs_is_arr = PyArray_Check(rhs_obj);
+
+    if (lhs_is_arr && rhs_is_arr) {
+        PyArrayObject *la = (PyArrayObject *)PyArray_FROM_OTF(
+            lhs_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+        PyArrayObject *ra = (PyArrayObject *)PyArray_FROM_OTF(
+            rhs_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+        if (!la || !ra) { Py_XDECREF(la); Py_XDECREF(ra); return NULL; }
+
+        npy_intp lsize = PyArray_SIZE(la);
+        npy_intp rsize = PyArray_SIZE(ra);
+        if (lsize != rsize) {
+            Py_DECREF(la); Py_DECREF(ra);
+            Py_RETURN_NONE;
+        }
+
+        int ndim = PyArray_NDIM(la);
+        npy_intp *shape = PyArray_DIMS(la);
+        PyArrayObject *result = (PyArrayObject *)PyArray_SimpleNew(ndim, shape, NPY_OBJECT);
+        if (!result) { Py_DECREF(la); Py_DECREF(ra); return NULL; }
+
+        PyObject **ls = (PyObject **)PyArray_DATA(la);
+        PyObject **rs = (PyObject **)PyArray_DATA(ra);
+        PyObject **ds = (PyObject **)PyArray_DATA(result);
+
+        for (npy_intp i = 0; i < lsize; i++) {
+            PyObject *r;
+            if (is_pow) r = Dual_pow(ls[i], rs[i], Py_None);
+            else        r = fn(ls[i], rs[i]);
+            if (!r) { Py_DECREF(la); Py_DECREF(ra); Py_DECREF(result); return NULL; }
+            ds[i] = r;
+        }
+        Py_DECREF(la); Py_DECREF(ra);
+        return (PyObject *)result;
+    }
+
+    if (lhs_is_arr && !rhs_is_arr) {
+        PyArrayObject *la = (PyArrayObject *)PyArray_FROM_OTF(
+            lhs_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+        if (!la) return NULL;
+
+        npy_intp size = PyArray_SIZE(la);
+        int ndim = PyArray_NDIM(la);
+        npy_intp *shape = PyArray_DIMS(la);
+        PyArrayObject *result = (PyArrayObject *)PyArray_SimpleNew(ndim, shape, NPY_OBJECT);
+        if (!result) { Py_DECREF(la); return NULL; }
+
+        PyObject **ls = (PyObject **)PyArray_DATA(la);
+        PyObject **ds = (PyObject **)PyArray_DATA(result);
+
+        for (npy_intp i = 0; i < size; i++) {
+            PyObject *r;
+            if (is_pow) r = Dual_pow(ls[i], rhs_obj, Py_None);
+            else        r = fn(ls[i], rhs_obj);
+            if (!r) { Py_DECREF(la); Py_DECREF(result); return NULL; }
+            ds[i] = r;
+        }
+        Py_DECREF(la);
+        return (PyObject *)result;
+    }
+
+    if (!lhs_is_arr && rhs_is_arr) {
+        PyArrayObject *ra = (PyArrayObject *)PyArray_FROM_OTF(
+            rhs_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+        if (!ra) return NULL;
+
+        npy_intp size = PyArray_SIZE(ra);
+        int ndim = PyArray_NDIM(ra);
+        npy_intp *shape = PyArray_DIMS(ra);
+        PyArrayObject *result = (PyArrayObject *)PyArray_SimpleNew(ndim, shape, NPY_OBJECT);
+        if (!result) { Py_DECREF(ra); return NULL; }
+
+        PyObject **rs = (PyObject **)PyArray_DATA(ra);
+        PyObject **ds = (PyObject **)PyArray_DATA(result);
+
+        for (npy_intp i = 0; i < size; i++) {
+            PyObject *r;
+            if (is_pow) r = Dual_pow(lhs_obj, rs[i], Py_None);
+            else        r = fn(lhs_obj, rs[i]);
+            if (!r) { Py_DECREF(ra); Py_DECREF(result); return NULL; }
+            ds[i] = r;
+        }
+        Py_DECREF(ra);
+        return (PyObject *)result;
+    }
+
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef module_methods[] = {
     {"reset",      mod_reset,      METH_NOARGS,  "Reset the variable ID counter"},
     {"seed_array", mod_seed_array, METH_O,       "Create a list of seed Duals from a sequence of floats"},
     {"val_array",  mod_val_array,  METH_O,       "Extract primal values from a sequence of Duals"},
     {"der_array",  mod_der_array,  METH_VARARGS, "Get derivatives of a sequence of Duals w.r.t. a seed"},
     {"jac_matrix", mod_jac_matrix, METH_VARARGS, "Compute Jacobian matrix (flat) from results and seeds"},
+    {"apply_unary_array",  mod_apply_unary_array,  METH_VARARGS, "Apply unary ufunc to object array of Duals"},
+    {"apply_binary_array", mod_apply_binary_array, METH_VARARGS, "Apply binary ufunc to object array(s) of Duals"},
     {NULL}
 };
 
 /* ---- Module init ---- */
 
 static int module_exec(PyObject *m) {
+    if (_import_array() < 0) return -1;
     if (PyType_Ready(&PyDual_Type) < 0) return -1;
 
     /* Set __array_priority__ via tp_dict (static types are immutable in 3.12+) */
