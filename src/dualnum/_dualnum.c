@@ -448,6 +448,11 @@ static int Dual_bool(PyObject *a) {
     return ((PyDualObject *)a)->val != 0.0;
 }
 
+static PyObject *Dual_complex(PyObject *a) {
+    Py_complex c = {((PyDualObject *)a)->val, 0.0};
+    return PyComplex_FromCComplex(c);
+}
+
 /* ---- Transcendental methods ---- */
 
 #define DUAL_UNARY_METHOD(name, func, dfunc)                            \
@@ -471,6 +476,24 @@ DUAL_UNARY_METHOD(arctan, atan,  1.0 / (1.0 + self->val * self->val))
 DUAL_UNARY_METHOD(sinh,   sinh,  cosh(self->val))
 DUAL_UNARY_METHOD(cosh,   cosh,  sinh(self->val))
 DUAL_UNARY_METHOD(tanh,   tanh,  1.0 - tanh(self->val) * tanh(self->val))
+DUAL_UNARY_METHOD(arcsinh, asinh, 1.0 / sqrt(self->val * self->val + 1.0))
+DUAL_UNARY_METHOD(arccosh, acosh, 1.0 / sqrt(self->val * self->val - 1.0))
+DUAL_UNARY_METHOD(arctanh, atanh, 1.0 / (1.0 - self->val * self->val))
+DUAL_UNARY_METHOD(exp2,   exp2,  exp2(self->val) * log(2.0))
+DUAL_UNARY_METHOD(log1p,  log1p, 1.0 / (1.0 + self->val))
+DUAL_UNARY_METHOD(expm1,  expm1, exp(self->val))
+/* square — can't use the macro since val = x^2 is not a single func(x) call */
+static PyObject *Dual_square(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    double v = self->val * self->val;
+    double dv = 2.0 * self->val;
+    return (PyObject *)PyDual_FromScale(v, &self->grad, dv);
+}
+DUAL_UNARY_METHOD(cbrt,   cbrt,  1.0 / (3.0 * cbrt(self->val) * cbrt(self->val)))
+
+static PyObject *Dual_sign(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    double s = (self->val > 0.0) ? 1.0 : (self->val < 0.0) ? -1.0 : 0.0;
+    return (PyObject *)PyDual_New(s);  /* derivative is 0 everywhere */
+}
 
 static PyObject *Dual_m_abs(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
     return Dual_abs((PyObject *)self);
@@ -478,6 +501,16 @@ static PyObject *Dual_m_abs(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
 
 static PyObject *Dual_conjugate(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
     return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
+}
+
+/* .real property — for real-valued Duals, returns self (copy) */
+static PyObject *Dual_get_real(PyDualObject *self, void *Py_UNUSED(closure)) {
+    return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
+}
+
+/* .imag property — for real-valued Duals, returns zero constant */
+static PyObject *Dual_get_imag(PyDualObject *self, void *Py_UNUSED(closure)) {
+    return (PyObject *)PyDual_New(0.0);
 }
 
 /* der(wrt) — get partial derivative w.r.t. a seed Dual */
@@ -590,6 +623,15 @@ static PyObject *Dual_array_ufunc(PyDualObject *self, PyObject *args, PyObject *
         else if (strcmp(ufunc_name, "negative") == 0) result = Dual_neg((PyObject *)d);
         else if (strcmp(ufunc_name, "positive") == 0) result = Dual_pos((PyObject *)d);
         else if (strcmp(ufunc_name, "conjugate") == 0) result = Dual_conjugate(d, NULL);
+        else if (strcmp(ufunc_name, "arcsinh") == 0)  result = Dual_arcsinh(d, NULL);
+        else if (strcmp(ufunc_name, "arccosh") == 0)  result = Dual_arccosh(d, NULL);
+        else if (strcmp(ufunc_name, "arctanh") == 0)  result = Dual_arctanh(d, NULL);
+        else if (strcmp(ufunc_name, "exp2") == 0)     result = Dual_exp2(d, NULL);
+        else if (strcmp(ufunc_name, "log1p") == 0)    result = Dual_log1p(d, NULL);
+        else if (strcmp(ufunc_name, "expm1") == 0)    result = Dual_expm1(d, NULL);
+        else if (strcmp(ufunc_name, "square") == 0)   result = Dual_square(d, NULL);
+        else if (strcmp(ufunc_name, "cbrt") == 0)     result = Dual_cbrt(d, NULL);
+        else if (strcmp(ufunc_name, "sign") == 0)     result = Dual_sign(d, NULL);
         else {
             Py_DECREF(ufunc_name_obj);
             Py_RETURN_NOTIMPLEMENTED;
@@ -635,8 +677,18 @@ static PyMethodDef Dual_methods[] = {
     {"sinh",      (PyCFunction)Dual_sinh,      METH_NOARGS,  "sinh(self)"},
     {"cosh",      (PyCFunction)Dual_cosh,      METH_NOARGS,  "cosh(self)"},
     {"tanh",      (PyCFunction)Dual_tanh,      METH_NOARGS,  "tanh(self)"},
+    {"arcsinh",   (PyCFunction)Dual_arcsinh,   METH_NOARGS,  "arcsinh(self)"},
+    {"arccosh",   (PyCFunction)Dual_arccosh,   METH_NOARGS,  "arccosh(self)"},
+    {"arctanh",   (PyCFunction)Dual_arctanh,   METH_NOARGS,  "arctanh(self)"},
+    {"exp2",      (PyCFunction)Dual_exp2,      METH_NOARGS,  "exp2(self)"},
+    {"log1p",     (PyCFunction)Dual_log1p,     METH_NOARGS,  "log1p(self)"},
+    {"expm1",     (PyCFunction)Dual_expm1,     METH_NOARGS,  "expm1(self)"},
+    {"square",    (PyCFunction)Dual_square,    METH_NOARGS,  "square(self)"},
+    {"cbrt",      (PyCFunction)Dual_cbrt,      METH_NOARGS,  "cbrt(self)"},
+    {"sign",      (PyCFunction)Dual_sign,      METH_NOARGS,  "sign(self)"},
     {"__abs__",   (PyCFunction)Dual_m_abs,     METH_NOARGS,  "abs(self)"},
     {"conjugate", (PyCFunction)Dual_conjugate, METH_NOARGS,  "conjugate(self)"},
+    {"__complex__", (PyCFunction)Dual_complex,  METH_NOARGS,  "complex(self)"},
     {"der",       (PyCFunction)Dual_der,       METH_VARARGS, "der(wrt) — partial derivative"},
     {"__array_ufunc__", (PyCFunction)Dual_array_ufunc, METH_VARARGS | METH_KEYWORDS,
      "numpy ufunc dispatch"},
@@ -655,6 +707,8 @@ static PyMemberDef Dual_members[] = {
 
 static PyGetSetDef Dual_getset[] = {
     {"grad", (getter)Dual_get_grad, NULL, "gradient dict {var_id: deriv}", NULL},
+    {"real", (getter)Dual_get_real, NULL, "real part (self for real Duals)", NULL},
+    {"imag", (getter)Dual_get_imag, NULL, "imaginary part (0 for real Duals)", NULL},
     {NULL}
 };
 

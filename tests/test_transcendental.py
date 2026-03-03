@@ -162,6 +162,114 @@ class TestTanh:
         assert der(z, x) == pytest.approx(1.0 - math.tanh(1.0) ** 2)
 
 
+class TestArcsinh:
+    def test_value(self):
+        x = Dual(1.0)
+        assert x.arcsinh().val == pytest.approx(math.asinh(1.0))
+
+    def test_derivative(self):
+        x = Dual(1.0)
+        z = x.arcsinh()
+        assert der(z, x) == pytest.approx(1.0 / math.sqrt(2.0))
+
+
+class TestArccosh:
+    def test_value(self):
+        x = Dual(2.0)
+        assert x.arccosh().val == pytest.approx(math.acosh(2.0))
+
+    def test_derivative(self):
+        x = Dual(2.0)
+        z = x.arccosh()
+        assert der(z, x) == pytest.approx(1.0 / math.sqrt(3.0))
+
+
+class TestArctanh:
+    def test_value(self):
+        x = Dual(0.5)
+        assert x.arctanh().val == pytest.approx(math.atanh(0.5))
+
+    def test_derivative(self):
+        x = Dual(0.5)
+        z = x.arctanh()
+        assert der(z, x) == pytest.approx(1.0 / (1.0 - 0.25))
+
+
+class TestExp2:
+    def test_value(self):
+        x = Dual(3.0)
+        assert x.exp2().val == pytest.approx(8.0)
+
+    def test_derivative(self):
+        x = Dual(3.0)
+        z = x.exp2()
+        assert der(z, x) == pytest.approx(8.0 * math.log(2.0))
+
+
+class TestLog1p:
+    def test_value(self):
+        x = Dual(1.0)
+        assert x.log1p().val == pytest.approx(math.log(2.0))
+
+    def test_derivative(self):
+        x = Dual(1.0)
+        z = x.log1p()
+        assert der(z, x) == pytest.approx(0.5)
+
+
+class TestExpm1:
+    def test_value(self):
+        x = Dual(1.0)
+        assert x.expm1().val == pytest.approx(math.e - 1.0)
+
+    def test_derivative(self):
+        x = Dual(1.0)
+        z = x.expm1()
+        assert der(z, x) == pytest.approx(math.e)
+
+
+class TestSquare:
+    def test_value(self):
+        x = Dual(3.0)
+        assert x.square().val == pytest.approx(9.0)
+
+    def test_derivative(self):
+        x = Dual(3.0)
+        z = x.square()
+        assert der(z, x) == pytest.approx(6.0)
+
+
+class TestCbrt:
+    def test_value(self):
+        x = Dual(27.0)
+        assert x.cbrt().val == pytest.approx(3.0)
+
+    def test_derivative(self):
+        x = Dual(8.0)
+        z = x.cbrt()
+        # d/dx cbrt(x) = 1/(3 * cbrt(x)^2) = 1/(3*4) = 1/12
+        assert der(z, x) == pytest.approx(1.0 / 12.0)
+
+
+class TestSign:
+    def test_positive(self):
+        x = Dual(3.0)
+        assert x.sign().val == 1.0
+
+    def test_negative(self):
+        x = Dual(-3.0)
+        assert x.sign().val == -1.0
+
+    def test_zero(self):
+        x = Dual(0.0)
+        assert x.sign().val == 0.0
+
+    def test_derivative_is_zero(self):
+        x = Dual(3.0)
+        z = x.sign()
+        assert der(z, x) == 0.0
+
+
 class TestComposition:
     def test_sin_of_product(self):
         x = Dual(1.0)
