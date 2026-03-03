@@ -755,8 +755,196 @@ static PyObject *mod_reset(PyObject *Py_UNUSED(self), PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
+/* seed_array(values) -> list of seed Duals */
+static PyObject *mod_seed_array(PyObject *Py_UNUSED(self), PyObject *arg) {
+    /* Accept any sequence/iterable of floats */
+    PyObject *seq = PySequence_Fast(arg, "seed_array expects a sequence");
+    if (!seq) return NULL;
+
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+    PyObject *result = PyList_New(n);
+    if (!result) { Py_DECREF(seq); return NULL; }
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = PySequence_Fast_GET_ITEM(seq, i);  /* borrowed */
+        double v = PyFloat_AsDouble(item);
+        if (v == -1.0 && PyErr_Occurred()) {
+            Py_DECREF(result);
+            Py_DECREF(seq);
+            return NULL;
+        }
+        PyDualObject *d = (PyDualObject *)PyDual_Type.tp_alloc(&PyDual_Type, 0);
+        if (!d) { Py_DECREF(result); Py_DECREF(seq); return NULL; }
+        d->val = v;
+        sg_init_seed(&d->grad);
+        d->var_id = d->grad.ids[0];
+        PyList_SET_ITEM(result, i, (PyObject *)d);  /* steals ref */
+    }
+    Py_DECREF(seq);
+    return result;
+}
+
+/* val_array(seq) -> list of primal doubles */
+static PyObject *mod_val_array(PyObject *Py_UNUSED(self), PyObject *arg) {
+    PyObject *seq = PySequence_Fast(arg, "val_array expects a sequence");
+    if (!seq) return NULL;
+
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+    PyObject *result = PyList_New(n);
+    if (!result) { Py_DECREF(seq); return NULL; }
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = PySequence_Fast_GET_ITEM(seq, i);
+        double v;
+        if (PyDual_Check(item)) {
+            v = ((PyDualObject *)item)->val;
+        } else {
+            v = PyFloat_AsDouble(item);
+            if (v == -1.0 && PyErr_Occurred()) {
+                Py_DECREF(result); Py_DECREF(seq); return NULL;
+            }
+        }
+        PyObject *fv = PyFloat_FromDouble(v);
+        if (!fv) { Py_DECREF(result); Py_DECREF(seq); return NULL; }
+        PyList_SET_ITEM(result, i, fv);
+    }
+    Py_DECREF(seq);
+    return result;
+}
+
+/* Helper: binary search for var_id in a SparseGrad, return deriv or 0.0 */
+static inline double sg_lookup(const SparseGrad *g, int32_t target_id) {
+    int32_t lo = 0, hi = g->len - 1;
+    while (lo <= hi) {
+        int32_t mid = (lo + hi) / 2;
+        if (g->ids[mid] == target_id) return g->derivs[mid];
+        else if (g->ids[mid] < target_id) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return 0.0;
+}
+
+/* der_array(results_seq, wrt_dual) -> list of doubles
+   Vectorized: get partial derivative of each result w.r.t. a single seed. */
+static PyObject *mod_der_array(PyObject *Py_UNUSED(self), PyObject *args) {
+    PyObject *results_seq, *wrt;
+    if (!PyArg_ParseTuple(args, "OO", &results_seq, &wrt)) return NULL;
+
+    if (!PyDual_Check(wrt)) {
+        PyErr_SetString(PyExc_TypeError, "wrt must be a Dual");
+        return NULL;
+    }
+    int32_t target_id = ((PyDualObject *)wrt)->var_id;
+
+    PyObject *seq = PySequence_Fast(results_seq, "results must be a sequence");
+    if (!seq) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+
+    PyObject *result = PyList_New(n);
+    if (!result) { Py_DECREF(seq); return NULL; }
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = PySequence_Fast_GET_ITEM(seq, i);
+        double d = 0.0;
+        if (PyDual_Check(item) && target_id >= 0) {
+            d = sg_lookup(&((PyDualObject *)item)->grad, target_id);
+        }
+        PyObject *fv = PyFloat_FromDouble(d);
+        if (!fv) { Py_DECREF(result); Py_DECREF(seq); return NULL; }
+        PyList_SET_ITEM(result, i, fv);
+    }
+    Py_DECREF(seq);
+    return result;
+}
+
+/* jac_matrix(results_seq, seeds_seq) -> flat list of doubles (row-major, n_results x n_seeds)
+   Computes J[i,j] = d(results[i]) / d(seeds[j]) entirely in C. */
+static PyObject *mod_jac_matrix(PyObject *Py_UNUSED(self), PyObject *args) {
+    PyObject *results_obj, *seeds_obj;
+    if (!PyArg_ParseTuple(args, "OO", &results_obj, &seeds_obj)) return NULL;
+
+    PyObject *results_seq = PySequence_Fast(results_obj, "results must be a sequence");
+    if (!results_seq) return NULL;
+    PyObject *seeds_seq = PySequence_Fast(seeds_obj, "seeds must be a sequence");
+    if (!seeds_seq) { Py_DECREF(results_seq); return NULL; }
+
+    Py_ssize_t nr = PySequence_Fast_GET_SIZE(results_seq);
+    Py_ssize_t ns = PySequence_Fast_GET_SIZE(seeds_seq);
+
+    /* Extract seed var_ids into a C array for fast access */
+    int32_t *seed_ids = (int32_t *)PyMem_Malloc(ns * sizeof(int32_t));
+    if (!seed_ids) {
+        Py_DECREF(results_seq); Py_DECREF(seeds_seq);
+        return PyErr_NoMemory();
+    }
+    for (Py_ssize_t j = 0; j < ns; j++) {
+        PyObject *s = PySequence_Fast_GET_ITEM(seeds_seq, j);
+        if (!PyDual_Check(s)) {
+            PyMem_Free(seed_ids);
+            Py_DECREF(results_seq); Py_DECREF(seeds_seq);
+            PyErr_SetString(PyExc_TypeError, "all seeds must be Dual");
+            return NULL;
+        }
+        seed_ids[j] = ((PyDualObject *)s)->var_id;
+    }
+
+    /* Allocate flat result buffer */
+    double *buf = (double *)PyMem_Malloc(nr * ns * sizeof(double));
+    if (!buf) {
+        PyMem_Free(seed_ids);
+        Py_DECREF(results_seq); Py_DECREF(seeds_seq);
+        return PyErr_NoMemory();
+    }
+
+    /* Fill the Jacobian: for each result, look up each seed_id */
+    for (Py_ssize_t i = 0; i < nr; i++) {
+        PyObject *r = PySequence_Fast_GET_ITEM(results_seq, i);
+        if (PyDual_Check(r)) {
+            const SparseGrad *g = &((PyDualObject *)r)->grad;
+            /* For each seed, binary-search in this result's grad */
+            for (Py_ssize_t j = 0; j < ns; j++) {
+                buf[i * ns + j] = (seed_ids[j] >= 0) ? sg_lookup(g, seed_ids[j]) : 0.0;
+            }
+        } else {
+            /* Non-Dual result: all derivatives are 0 */
+            for (Py_ssize_t j = 0; j < ns; j++) {
+                buf[i * ns + j] = 0.0;
+            }
+        }
+    }
+
+    /* Build a flat Python list of doubles */
+    PyObject *result = PyList_New(nr * ns);
+    if (!result) {
+        PyMem_Free(buf); PyMem_Free(seed_ids);
+        Py_DECREF(results_seq); Py_DECREF(seeds_seq);
+        return NULL;
+    }
+    for (Py_ssize_t k = 0; k < nr * ns; k++) {
+        PyObject *fv = PyFloat_FromDouble(buf[k]);
+        if (!fv) {
+            Py_DECREF(result); PyMem_Free(buf); PyMem_Free(seed_ids);
+            Py_DECREF(results_seq); Py_DECREF(seeds_seq);
+            return NULL;
+        }
+        PyList_SET_ITEM(result, k, fv);
+    }
+
+    PyMem_Free(buf);
+    PyMem_Free(seed_ids);
+    Py_DECREF(results_seq);
+    Py_DECREF(seeds_seq);
+
+    /* Return (flat_list, nr, ns) so Python can reshape */
+    return Py_BuildValue("(Onn)", result, nr, ns);
+}
+
 static PyMethodDef module_methods[] = {
-    {"reset", mod_reset, METH_NOARGS, "Reset the variable ID counter"},
+    {"reset",      mod_reset,      METH_NOARGS,  "Reset the variable ID counter"},
+    {"seed_array", mod_seed_array, METH_O,       "Create a list of seed Duals from a sequence of floats"},
+    {"val_array",  mod_val_array,  METH_O,       "Extract primal values from a sequence of Duals"},
+    {"der_array",  mod_der_array,  METH_VARARGS, "Get derivatives of a sequence of Duals w.r.t. a seed"},
+    {"jac_matrix", mod_jac_matrix, METH_VARARGS, "Compute Jacobian matrix (flat) from results and seeds"},
     {NULL}
 };
 

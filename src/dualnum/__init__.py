@@ -1,4 +1,8 @@
 from ._dualnum import Dual, reset
+from ._dualnum import seed_array as _c_seed_array
+from ._dualnum import val_array as _c_val_array
+from ._dualnum import der_array as _c_der_array
+from ._dualnum import jac_matrix as _c_jac_matrix
 import functools
 import numpy as np
 
@@ -9,7 +13,9 @@ def der(result, wrt):
     Works on scalars and numpy arrays of Duals.
     """
     if isinstance(result, np.ndarray):
-        return np.array([der(r, wrt) for r in result.flat]).reshape(result.shape)
+        flat = list(result.flat)
+        derivs = _c_der_array(flat, wrt)
+        return np.array(derivs).reshape(result.shape)
     if isinstance(result, Dual):
         return result.der(wrt)
     return 0.0
@@ -17,32 +23,22 @@ def der(result, wrt):
 
 def jac(results, seeds):
     """Compute the Jacobian matrix: J[i, j] = d(results[i]) / d(seeds[j])."""
-    results_arr = np.asarray(results)
-    seeds = list(seeds)
-    n = results_arr.size
-    m = len(seeds)
-    J = np.zeros((n, m))
-    for i, r in enumerate(results_arr.flat):
-        for j, s in enumerate(seeds):
-            J[i, j] = der(r, s)
-    return J
+    results_flat = list(np.asarray(results).flat)
+    seeds_list = list(seeds)
+    flat, nr, ns = _c_jac_matrix(results_flat, seeds_list)
+    return np.array(flat).reshape(nr, ns)
 
 
 def seed_array(values):
     """Create a numpy array of independent seed Duals from a list of floats."""
-    return np.array([Dual(float(v)) for v in values])
+    return np.array(_c_seed_array(list(values)), dtype=object)
 
 
 def val(arr):
     """Extract primal values from an array of Duals."""
     arr = np.asarray(arr)
-    out = np.empty(arr.shape, dtype=float)
-    for i, d in enumerate(arr.flat):
-        if isinstance(d, Dual):
-            out.flat[i] = d.val
-        else:
-            out.flat[i] = float(d)
-    return out
+    flat = list(arr.flat)
+    return np.array(_c_val_array(flat)).reshape(arr.shape)
 
 
 def autojac(fnc):
