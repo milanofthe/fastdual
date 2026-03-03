@@ -527,6 +527,245 @@ static PyObject *Dual_conjugate(PyDualObject *self, PyObject *Py_UNUSED(ignored)
     return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
 }
 
+/* ---- Floor / Ceil (piecewise constant, derivative = 0) ---- */
+
+static PyObject *Dual_floor(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    return (PyObject *)PyDual_New(floor(self->val));
+}
+
+static PyObject *Dual_ceil(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    return (PyObject *)PyDual_New(ceil(self->val));
+}
+
+/* ---- __format__ ---- */
+
+static PyObject *Dual_format(PyDualObject *self, PyObject *fmt_spec) {
+    PyObject *fv = PyFloat_FromDouble(self->val);
+    if (!fv) return NULL;
+    PyObject *result = PyObject_Format(fv, fmt_spec);
+    Py_DECREF(fv);
+    return result;
+}
+
+/* ---- __round__ ---- */
+
+static PyObject *Dual_round(PyDualObject *self, PyObject *args) {
+    PyObject *ndigits = NULL;
+    if (!PyArg_ParseTuple(args, "|O", &ndigits)) return NULL;
+
+    /* Delegate to float.__round__ for correct behavior */
+    PyObject *fv = PyFloat_FromDouble(self->val);
+    if (!fv) return NULL;
+
+    PyObject *result;
+    if (ndigits == NULL || ndigits == Py_None) {
+        result = PyObject_CallMethod(fv, "__round__", NULL);
+    } else {
+        result = PyObject_CallMethod(fv, "__round__", "O", ndigits);
+    }
+    Py_DECREF(fv);
+    return result;  /* int when no ndigits, float when ndigits given */
+}
+
+/* ---- __floordiv__ ---- */
+
+static PyObject *Dual_floordiv(PyObject *a, PyObject *b) {
+    double va, vb;
+    if (!as_double(a, &va) || !as_double(b, &vb))
+        Py_RETURN_NOTIMPLEMENTED;
+    if (vb == 0.0) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "Dual floor division by zero");
+        return NULL;
+    }
+    return (PyObject *)PyDual_New(floor(va / vb));  /* derivative = 0 */
+}
+
+/* ---- __mod__ ---- */
+
+static PyObject *Dual_mod(PyObject *a, PyObject *b) {
+    double va, vb;
+    if (!as_double(a, &va) || !as_double(b, &vb))
+        Py_RETURN_NOTIMPLEMENTED;
+    if (vb == 0.0) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "Dual modulo by zero");
+        return NULL;
+    }
+    return (PyObject *)PyDual_New(fmod(va, vb));  /* derivative = 0 */
+}
+
+/* ---- __divmod__ ---- */
+
+static PyObject *Dual_divmod(PyObject *a, PyObject *b) {
+    double va, vb;
+    if (!as_double(a, &va) || !as_double(b, &vb))
+        Py_RETURN_NOTIMPLEMENTED;
+    if (vb == 0.0) {
+        PyErr_SetString(PyExc_ZeroDivisionError, "Dual divmod by zero");
+        return NULL;
+    }
+    PyObject *q = (PyObject *)PyDual_New(floor(va / vb));
+    PyObject *r = (PyObject *)PyDual_New(fmod(va, vb));
+    if (!q || !r) { Py_XDECREF(q); Py_XDECREF(r); return NULL; }
+    PyObject *tup = PyTuple_Pack(2, q, r);
+    Py_DECREF(q);
+    Py_DECREF(r);
+    return tup;
+}
+
+/* ---- __reduce__ (pickle support) ---- */
+
+static PyObject *Dual_reduce(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    PyObject *args = Py_BuildValue("(di)", self->val, 0);
+    if (!args) return NULL;
+    PyObject *result = Py_BuildValue("(OO)", Py_TYPE(self), args);
+    Py_DECREF(args);
+    return result;
+}
+
+/* ---- __copy__ / __deepcopy__ ---- */
+
+static PyObject *Dual_copy(PyDualObject *self, PyObject *Py_UNUSED(ignored)) {
+    return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
+}
+
+static PyObject *Dual_deepcopy(PyDualObject *self, PyObject *Py_UNUSED(memo)) {
+    return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
+}
+
+/* ---- Binary ufunc functions ---- */
+
+static PyObject *Dual_maximum(PyObject *a, PyObject *b) {
+    double va, vb;
+    int a_dual = PyDual_Check(a), b_dual = PyDual_Check(b);
+
+    if (a_dual && b_dual) {
+        PyDualObject *da = (PyDualObject *)a, *db = (PyDualObject *)b;
+        if (da->val >= db->val)
+            return (PyObject *)PyDual_FromScale(da->val, &da->grad, 1.0);
+        else
+            return (PyObject *)PyDual_FromScale(db->val, &db->grad, 1.0);
+    }
+    if (a_dual && as_double(b, &vb)) {
+        PyDualObject *da = (PyDualObject *)a;
+        return da->val >= vb
+            ? (PyObject *)PyDual_FromScale(da->val, &da->grad, 1.0)
+            : (PyObject *)PyDual_New(vb);
+    }
+    if (b_dual && as_double(a, &va)) {
+        PyDualObject *db = (PyDualObject *)b;
+        return va >= db->val
+            ? (PyObject *)PyDual_New(va)
+            : (PyObject *)PyDual_FromScale(db->val, &db->grad, 1.0);
+    }
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
+static PyObject *Dual_minimum(PyObject *a, PyObject *b) {
+    double va, vb;
+    int a_dual = PyDual_Check(a), b_dual = PyDual_Check(b);
+
+    if (a_dual && b_dual) {
+        PyDualObject *da = (PyDualObject *)a, *db = (PyDualObject *)b;
+        if (da->val <= db->val)
+            return (PyObject *)PyDual_FromScale(da->val, &da->grad, 1.0);
+        else
+            return (PyObject *)PyDual_FromScale(db->val, &db->grad, 1.0);
+    }
+    if (a_dual && as_double(b, &vb)) {
+        PyDualObject *da = (PyDualObject *)a;
+        return da->val <= vb
+            ? (PyObject *)PyDual_FromScale(da->val, &da->grad, 1.0)
+            : (PyObject *)PyDual_New(vb);
+    }
+    if (b_dual && as_double(a, &va)) {
+        PyDualObject *db = (PyDualObject *)b;
+        return va <= db->val
+            ? (PyObject *)PyDual_New(va)
+            : (PyObject *)PyDual_FromScale(db->val, &db->grad, 1.0);
+    }
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
+static PyObject *Dual_arctan2(PyObject *a, PyObject *b) {
+    /* arctan2(y, x): a = y, b = x */
+    double va, vb;
+    int a_dual = PyDual_Check(a), b_dual = PyDual_Check(b);
+
+    if (a_dual && b_dual) {
+        PyDualObject *dy = (PyDualObject *)a, *dx = (PyDualObject *)b;
+        double denom = dx->val * dx->val + dy->val * dy->val;
+        return (PyObject *)PyDual_FromMerge(atan2(dy->val, dx->val),
+            &dy->grad,  dx->val / denom,    /* d/dy = x/(x²+y²) */
+            &dx->grad, -dy->val / denom);   /* d/dx = -y/(x²+y²) */
+    }
+    if (a_dual && as_double(b, &vb)) {
+        PyDualObject *dy = (PyDualObject *)a;
+        double denom = vb * vb + dy->val * dy->val;
+        return (PyObject *)PyDual_FromScale(atan2(dy->val, vb),
+            &dy->grad, vb / denom);
+    }
+    if (b_dual && as_double(a, &va)) {
+        PyDualObject *dx = (PyDualObject *)b;
+        double denom = dx->val * dx->val + va * va;
+        return (PyObject *)PyDual_FromScale(atan2(va, dx->val),
+            &dx->grad, -va / denom);
+    }
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
+static PyObject *Dual_hypot(PyObject *a, PyObject *b) {
+    double va, vb;
+    int a_dual = PyDual_Check(a), b_dual = PyDual_Check(b);
+
+    if (a_dual && b_dual) {
+        PyDualObject *da = (PyDualObject *)a, *db = (PyDualObject *)b;
+        double h = hypot(da->val, db->val);
+        double inv = (h == 0.0) ? 0.0 : 1.0 / h;
+        return (PyObject *)PyDual_FromMerge(h,
+            &da->grad, da->val * inv,
+            &db->grad, db->val * inv);
+    }
+    if (a_dual && as_double(b, &vb)) {
+        PyDualObject *da = (PyDualObject *)a;
+        double h = hypot(da->val, vb);
+        double inv = (h == 0.0) ? 0.0 : 1.0 / h;
+        return (PyObject *)PyDual_FromScale(h, &da->grad, da->val * inv);
+    }
+    if (b_dual && as_double(a, &va)) {
+        PyDualObject *db = (PyDualObject *)b;
+        double h = hypot(va, db->val);
+        double inv = (h == 0.0) ? 0.0 : 1.0 / h;
+        return (PyObject *)PyDual_FromScale(h, &db->grad, db->val * inv);
+    }
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
+static PyObject *Dual_copysign(PyObject *a, PyObject *b) {
+    /* copysign(a, b) = |a| * sign(b), d/da = sign(b) * sign(a), d/db = 0 */
+    double va, vb;
+    int a_dual = PyDual_Check(a), b_dual = PyDual_Check(b);
+
+    if (a_dual && as_double(b, &vb)) {
+        PyDualObject *da = (PyDualObject *)a;
+        double sign_a = (da->val > 0.0) ? 1.0 : (da->val < 0.0) ? -1.0 : 0.0;
+        double sign_b = (vb >= 0.0) ? 1.0 : -1.0;
+        return (PyObject *)PyDual_FromScale(copysign(da->val, vb),
+            &da->grad, sign_b * sign_a);
+    }
+    if (b_dual && as_double(a, &va)) {
+        /* d/db = 0 */
+        return (PyObject *)PyDual_New(copysign(va, ((PyDualObject *)b)->val));
+    }
+    if (a_dual && b_dual) {
+        PyDualObject *da = (PyDualObject *)a, *db = (PyDualObject *)b;
+        double sign_a = (da->val > 0.0) ? 1.0 : (da->val < 0.0) ? -1.0 : 0.0;
+        double sign_b = (db->val >= 0.0) ? 1.0 : -1.0;
+        return (PyObject *)PyDual_FromScale(copysign(da->val, db->val),
+            &da->grad, sign_b * sign_a);  /* d/db = 0 */
+    }
+    Py_RETURN_NOTIMPLEMENTED;
+}
+
 /* .real property — for real-valued Duals, returns self (copy) */
 static PyObject *Dual_get_real(PyDualObject *self, void *Py_UNUSED(closure)) {
     return (PyObject *)PyDual_FromScale(self->val, &self->grad, 1.0);
@@ -656,6 +895,18 @@ static PyObject *Dual_array_ufunc(PyDualObject *self, PyObject *args, PyObject *
         else if (strcmp(ufunc_name, "square") == 0)   result = Dual_square(d, NULL);
         else if (strcmp(ufunc_name, "cbrt") == 0)     result = Dual_cbrt(d, NULL);
         else if (strcmp(ufunc_name, "sign") == 0)     result = Dual_sign(d, NULL);
+        else if (strcmp(ufunc_name, "fabs") == 0)     result = Dual_abs((PyObject *)d);
+        else if (strcmp(ufunc_name, "floor") == 0)    result = Dual_floor(d, NULL);
+        else if (strcmp(ufunc_name, "ceil") == 0)     result = Dual_ceil(d, NULL);
+        else if (strcmp(ufunc_name, "isfinite") == 0) {
+            result = PyBool_FromLong(isfinite(d->val));
+        }
+        else if (strcmp(ufunc_name, "isinf") == 0) {
+            result = PyBool_FromLong(isinf(d->val));
+        }
+        else if (strcmp(ufunc_name, "isnan") == 0) {
+            result = PyBool_FromLong(isnan(d->val));
+        }
         else {
             Py_DECREF(ufunc_name_obj);
             Py_RETURN_NOTIMPLEMENTED;
@@ -671,6 +922,14 @@ static PyObject *Dual_array_ufunc(PyDualObject *self, PyObject *args, PyObject *
         else if (strcmp(ufunc_name, "true_divide") == 0 ||
                  strcmp(ufunc_name, "divide") == 0) result = Dual_truediv(lhs, rhs);
         else if (strcmp(ufunc_name, "power") == 0)     result = Dual_pow(lhs, rhs, Py_None);
+        else if (strcmp(ufunc_name, "maximum") == 0)   result = Dual_maximum(lhs, rhs);
+        else if (strcmp(ufunc_name, "minimum") == 0)   result = Dual_minimum(lhs, rhs);
+        else if (strcmp(ufunc_name, "arctan2") == 0)   result = Dual_arctan2(lhs, rhs);
+        else if (strcmp(ufunc_name, "hypot") == 0)     result = Dual_hypot(lhs, rhs);
+        else if (strcmp(ufunc_name, "copysign") == 0)  result = Dual_copysign(lhs, rhs);
+        else if (strcmp(ufunc_name, "floor_divide") == 0) result = Dual_floordiv(lhs, rhs);
+        else if (strcmp(ufunc_name, "remainder") == 0 ||
+                 strcmp(ufunc_name, "mod") == 0)       result = Dual_mod(lhs, rhs);
         else {
             Py_DECREF(ufunc_name_obj);
             Py_RETURN_NOTIMPLEMENTED;
@@ -716,6 +975,16 @@ static PyMethodDef Dual_methods[] = {
     {"der",       (PyCFunction)Dual_der,       METH_VARARGS, "der(wrt) — partial derivative"},
     {"__array_ufunc__", (PyCFunction)Dual_array_ufunc, METH_VARARGS | METH_KEYWORDS,
      "numpy ufunc dispatch"},
+    {"__format__",  (PyCFunction)Dual_format,   METH_O,       "format(self, spec)"},
+    {"__round__",   (PyCFunction)Dual_round,    METH_VARARGS, "round(self, ndigits=None)"},
+    {"__floor__",   (PyCFunction)Dual_floor,    METH_NOARGS,  "math.floor(self)"},
+    {"__ceil__",    (PyCFunction)Dual_ceil,     METH_NOARGS,  "math.ceil(self)"},
+    {"__reduce__",  (PyCFunction)Dual_reduce,   METH_NOARGS,  "pickle support"},
+    {"__copy__",    (PyCFunction)Dual_copy,     METH_NOARGS,  "copy.copy(self)"},
+    {"__deepcopy__",(PyCFunction)Dual_deepcopy, METH_O,       "copy.deepcopy(self)"},
+    {"floor",       (PyCFunction)Dual_floor,    METH_NOARGS,  "floor(self)"},
+    {"ceil",        (PyCFunction)Dual_ceil,     METH_NOARGS,  "ceil(self)"},
+    {"fabs",        (PyCFunction)Dual_m_abs,    METH_NOARGS,  "fabs(self)"},
     {NULL}
 };
 
@@ -739,17 +1008,20 @@ static PyGetSetDef Dual_getset[] = {
 /* ---- Number methods struct ---- */
 
 static PyNumberMethods Dual_as_number = {
-    .nb_add         = Dual_add,
-    .nb_subtract    = Dual_sub,
-    .nb_multiply    = Dual_mul,
-    .nb_true_divide = Dual_truediv,
-    .nb_power       = Dual_pow,
-    .nb_negative    = Dual_neg,
-    .nb_positive    = Dual_pos,
-    .nb_absolute    = Dual_abs,
-    .nb_float       = Dual_float,
-    .nb_int         = Dual_int,
-    .nb_bool        = (inquiry)Dual_bool,
+    .nb_add           = Dual_add,
+    .nb_subtract      = Dual_sub,
+    .nb_multiply      = Dual_mul,
+    .nb_true_divide   = Dual_truediv,
+    .nb_floor_divide  = Dual_floordiv,
+    .nb_remainder     = Dual_mod,
+    .nb_divmod        = Dual_divmod,
+    .nb_power         = Dual_pow,
+    .nb_negative      = Dual_neg,
+    .nb_positive      = Dual_pos,
+    .nb_absolute      = Dual_abs,
+    .nb_float         = Dual_float,
+    .nb_int           = Dual_int,
+    .nb_bool          = (inquiry)Dual_bool,
 };
 
 /* ---- Type object ---- */
@@ -1003,6 +1275,9 @@ static const unary_entry unary_table[] = {
     {"negative",  (unary_fn)wrap_neg},
     {"positive",  (unary_fn)wrap_pos},
     {"conjugate", (unary_fn)Dual_conjugate},
+    {"fabs",      (unary_fn)wrap_abs},
+    {"floor",     (unary_fn)Dual_floor},
+    {"ceil",      (unary_fn)Dual_ceil},
     {NULL, NULL}
 };
 
@@ -1011,6 +1286,45 @@ static PyObject *mod_apply_unary_array(PyObject *Py_UNUSED(self), PyObject *args
     const char *name;
     PyObject *arr_obj;
     if (!PyArg_ParseTuple(args, "sO", &name, &arr_obj)) return NULL;
+
+    /* Predicate ufuncs: return bool array, not Dual array */
+    int predicate = 0;
+    int pred_type = 0;  /* 0=isfinite, 1=isinf, 2=isnan */
+    if (strcmp(name, "isfinite") == 0) { predicate = 1; pred_type = 0; }
+    else if (strcmp(name, "isinf") == 0) { predicate = 1; pred_type = 1; }
+    else if (strcmp(name, "isnan") == 0) { predicate = 1; pred_type = 2; }
+
+    if (predicate) {
+        PyArrayObject *arr = (PyArrayObject *)PyArray_FROM_OTF(
+            arr_obj, NPY_OBJECT, NPY_ARRAY_IN_ARRAY);
+        if (!arr) return NULL;
+
+        npy_intp size = PyArray_SIZE(arr);
+        int ndim = PyArray_NDIM(arr);
+        npy_intp *shape = PyArray_DIMS(arr);
+
+        PyArrayObject *result = (PyArrayObject *)PyArray_SimpleNew(ndim, shape, NPY_BOOL);
+        if (!result) { Py_DECREF(arr); return NULL; }
+
+        PyObject **src = (PyObject **)PyArray_DATA(arr);
+        npy_bool *dst = (npy_bool *)PyArray_DATA(result);
+
+        for (npy_intp i = 0; i < size; i++) {
+            if (!PyDual_Check(src[i])) {
+                PyErr_SetString(PyExc_TypeError, "array elements must be Dual");
+                Py_DECREF(arr); Py_DECREF(result);
+                return NULL;
+            }
+            double v = ((PyDualObject *)src[i])->val;
+            switch (pred_type) {
+                case 0: dst[i] = isfinite(v) ? NPY_TRUE : NPY_FALSE; break;
+                case 1: dst[i] = isinf(v) ? NPY_TRUE : NPY_FALSE; break;
+                case 2: dst[i] = isnan(v) ? NPY_TRUE : NPY_FALSE; break;
+            }
+        }
+        Py_DECREF(arr);
+        return (PyObject *)result;
+    }
 
     unary_fn fn = NULL;
     for (const unary_entry *e = unary_table; e->name; e++) {
@@ -1054,12 +1368,19 @@ typedef PyObject *(*binary_fn)(PyObject *, PyObject *);
 typedef struct { const char *name; binary_fn fn; int is_pow; } binary_entry;
 
 static const binary_entry binary_table[] = {
-    {"add",         (binary_fn)Dual_add,     0},
-    {"subtract",    (binary_fn)Dual_sub,     0},
-    {"multiply",    (binary_fn)Dual_mul,     0},
-    {"true_divide", (binary_fn)Dual_truediv, 0},
-    {"divide",      (binary_fn)Dual_truediv, 0},
-    {"power",       NULL,                    1},
+    {"add",           (binary_fn)Dual_add,      0},
+    {"subtract",      (binary_fn)Dual_sub,      0},
+    {"multiply",      (binary_fn)Dual_mul,      0},
+    {"true_divide",   (binary_fn)Dual_truediv,  0},
+    {"divide",        (binary_fn)Dual_truediv,  0},
+    {"power",         NULL,                     1},
+    {"maximum",       (binary_fn)Dual_maximum,  0},
+    {"minimum",       (binary_fn)Dual_minimum,  0},
+    {"arctan2",       (binary_fn)Dual_arctan2,  0},
+    {"hypot",         (binary_fn)Dual_hypot,    0},
+    {"copysign",      (binary_fn)Dual_copysign, 0},
+    {"floor_divide",  (binary_fn)Dual_floordiv, 0},
+    {"remainder",     (binary_fn)Dual_mod,      0},
     {NULL, NULL, 0}
 };
 

@@ -29,7 +29,9 @@ class DualArray(np.ndarray):
             arr = np.asarray(inputs[0])
             result = _c_apply_unary(name, arr)
             if result is not None:
-                return result.view(DualArray)
+                if result.dtype == object:
+                    return result.view(DualArray)
+                return result  # predicate ufuncs return bool arrays
 
         elif len(inputs) == 2:
             lhs = np.asarray(inputs[0]) if isinstance(inputs[0], np.ndarray) else inputs[0]
