@@ -9,6 +9,8 @@ import functools
 import warnings
 import numpy as np
 
+from ._optimize import minimize
+
 
 # ---------------------------------------------------------------------------
 # __array_function__ protocol — dispatch table
