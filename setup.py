@@ -20,4 +20,7 @@ setup(
             include_dirs=[np.get_include()],
         )
     ],
+    package_data={
+        "fastdual": ["py.typed", "*.pyi"],
+    },
 )
