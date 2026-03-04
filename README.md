@@ -134,7 +134,7 @@ np.linalg.solve(A, b)  # linear solve with gradient propagation
 
 ## Supported Operations
 
-Both `Dual` (first-order) and `HyperDual` (second-order) types are C extensions supporting the same operations.
+Both `Dual` (first-order) and `HyperDual` (second-order) types are C extensions. All operations work as methods and (for `Dual`) as NumPy ufuncs.
 
 ### Arithmetic
 
@@ -144,13 +144,15 @@ Both `Dual` (first-order) and `HyperDual` (second-order) types are C extensions 
 | Subtraction | `a - b` | yes | yes |
 | Multiplication | `a * b` | yes | yes |
 | Division | `a / b` | yes | yes |
+| Floor division | `a // b` | yes | — |
+| Modulo | `a % b` | yes | — |
 | Power | `a ** b` | yes | yes |
 | Negation | `-a` | yes | yes |
 | Absolute value | `abs(a)` | yes | yes |
 
 ### Transcendental Functions
 
-All available as methods (`.sin()`) and via NumPy (`np.sin()`) on `Dual`. On `HyperDual`, available as methods.
+Available as methods (`.sin()`) on both types and via NumPy ufuncs (`np.sin()`) on `Dual`/`DualArray`.
 
 | Function | Method | Derivative |
 |----------|--------|------------|
@@ -177,14 +179,31 @@ All available as methods (`.sin()`) and via NumPy (`np.sin()`) on `Dual`. On `Hy
 | `square` | `.square()` | 2x |
 | `cbrt` | `.cbrt()` | 1/(3x^⅔) |
 
+### Binary Functions (Dual only)
+
+These are available via NumPy ufuncs on `Dual`/`DualArray`.
+
+| Function | Usage | Description |
+|----------|-------|-------------|
+| `arctan2` | `np.arctan2(y, x)` | Two-argument arctangent |
+| `hypot` | `np.hypot(a, b)` | √(a² + b²) with gradient |
+| `maximum` | `np.maximum(a, b)` | Element-wise maximum |
+| `minimum` | `np.minimum(a, b)` | Element-wise minimum |
+| `copysign` | `np.copysign(a, b)` | Magnitude of a, sign of b |
+
 ### Utility Functions
 
-| Function | Method | Description |
-|----------|--------|-------------|
-| `sign` | `.sign()` | Sign function (derivative = 0) |
-| `conjugate` | `.conjugate()` | Complex conjugate (identity for reals) |
-| `floor` | `.floor()` | Floor (derivative = 0) |
-| `ceil` | `.ceil()` | Ceiling (derivative = 0) |
+| Function | Method | Dual | HyperDual |
+|----------|--------|:----:|:---------:|
+| `sign` | `.sign()` | yes | yes |
+| `fabs` | `.fabs()` | yes | yes |
+| `conjugate` | `.conjugate()` | yes | yes |
+| `floor` | `.floor()` | yes | yes |
+| `ceil` | `.ceil()` | yes | yes |
+
+### Predicates (Dual only)
+
+`np.isfinite()`, `np.isinf()`, `np.isnan()` — check the primal value, return `bool`.
 
 ### Comparisons
 

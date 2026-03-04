@@ -662,6 +662,7 @@ static PyMethodDef HyperDual_methods[] = {
     {"conjugate", (PyCFunction)HyperDual_conjugate, METH_NOARGS, NULL},
     {"floor",     (PyCFunction)HyperDual_floor,     METH_NOARGS, NULL},
     {"ceil",      (PyCFunction)HyperDual_ceil,      METH_NOARGS, NULL},
+    {"fabs",      (PyCFunction)HyperDual_abs,       METH_NOARGS, NULL},
     {NULL}
 };
 
