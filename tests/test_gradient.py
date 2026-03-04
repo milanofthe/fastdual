@@ -1,6 +1,6 @@
 import pytest
 import math
-from fastdual import Dual, der, jac, seed_array, val, reset
+from fastdual import Dual, DualArray, der, jac, val, reset
 import numpy as np
 
 
@@ -140,16 +140,16 @@ class TestJacobian:
         np.testing.assert_allclose(J, expected)
 
 
-class TestSeedArray:
+class TestDualArraySeeding:
     def test_creates_independent_seeds(self):
-        arr = seed_array([1.0, 2.0, 3.0])
+        arr = DualArray([1.0, 2.0, 3.0])
         assert len(arr) == 3
         for d in arr:
             assert isinstance(d, Dual)
             assert d.var_id >= 0
 
     def test_seeds_are_independent(self):
-        arr = seed_array([1.0, 2.0])
+        arr = DualArray([1.0, 2.0])
         assert der(arr[0], arr[1]) == 0.0
         assert der(arr[1], arr[0]) == 0.0
         assert der(arr[0], arr[0]) == 1.0
@@ -157,7 +157,7 @@ class TestSeedArray:
 
 class TestValFunction:
     def test_extracts_values(self):
-        arr = seed_array([1.0, 2.0, 3.0])
+        arr = DualArray([1.0, 2.0, 3.0])
         v = val(arr)
         np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
 

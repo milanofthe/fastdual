@@ -6,15 +6,28 @@ from ._fastdual import jac_matrix as _c_jac_matrix
 from ._fastdual import apply_unary_array as _c_apply_unary
 from ._fastdual import apply_binary_array as _c_apply_binary
 import functools
+import warnings
 import numpy as np
 
 
 class DualArray(np.ndarray):
-    """ndarray subclass that intercepts ufuncs for C-level batch dispatch."""
+    """ndarray subclass that intercepts ufuncs for C-level batch dispatch.
+
+    When constructed with numeric input (list, tuple, or ndarray of floats/ints),
+    automatically creates independent seed Duals::
+
+        x = DualArray([1.0, 2.0, 3.0])  # 3 independent seeds
+
+    When constructed with an array of existing Dual objects, wraps them as-is.
+    """
     __array_priority__ = 25.0
 
     def __new__(cls, input_array):
-        return np.asarray(input_array, dtype=object).view(cls)
+        arr = np.asarray(input_array)
+        # Auto-seed: if input is numeric (not object dtype), create seeds
+        if arr.dtype != object:
+            return np.asarray(_c_seed_array(arr.ravel().tolist()), dtype=object).reshape(arr.shape).view(cls)
+        return arr.view(cls)
 
     def __array_finalize__(self, obj):
         pass
@@ -76,8 +89,17 @@ def jac(results, seeds):
 
 
 def seed_array(values):
-    """Create a numpy array of independent seed Duals from a list of floats."""
-    return DualArray(_c_seed_array(list(values)))
+    """Create a numpy array of independent seed Duals from a list of floats.
+
+    .. deprecated:: 0.2.0
+        Use ``DualArray(values)`` instead.
+    """
+    warnings.warn(
+        "seed_array() is deprecated, use DualArray() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return DualArray(list(values))
 
 
 def val(arr):
@@ -102,7 +124,7 @@ def autojac(fnc):
     """
     @functools.wraps(fnc)
     def wrapper(*args):
-        seeds = seed_array(args)
+        seeds = DualArray(list(args))
         out = fnc(*seeds)
         out_arr = np.atleast_1d(out)
         return val(out_arr), jac(out_arr, seeds)

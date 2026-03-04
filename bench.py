@@ -13,7 +13,7 @@ import numpy as np
 # Add src to path for fastdual
 sys.path.insert(0, "src")
 
-from fastdual import Dual, der, jac, seed_array, val, reset, autojac
+from fastdual import Dual, DualArray, der, jac, val, reset, autojac
 
 # Import original Value (standalone copy from pathsim)
 sys.path.insert(0, ".")
@@ -274,7 +274,7 @@ section("ARRAY OPERATIONS (object dtype)")
 
 for arr_size in [10, 50, 100]:
     reset()
-    d_arr = seed_array(np.arange(1.0, arr_size + 1.0))
+    d_arr = DualArray(np.arange(1.0, arr_size + 1.0))
     v_arr = Value.array(np.arange(1.0, arr_size + 1.0))
 
     iters = max(100, 20_000 // arr_size)
@@ -332,7 +332,7 @@ def rosenbrock_value(xy):
 
 def operator_jac_dual(fn, x0):
     reset()
-    seeds = seed_array(x0)
+    seeds = DualArray(x0)
     out = fn(seeds)
     return jac(out, seeds)
 
