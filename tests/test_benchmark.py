@@ -241,6 +241,31 @@ def test_hd_exp(benchmark):
     benchmark(lambda: x.exp())
 
 
+# -- End-to-end: gradient (Dual) vs Hessian (HyperDual) ----------------------
+
+def _make_gradient_fun(n):
+    """Evaluate f and extract full gradient via Dual."""
+    def run():
+        x = DualArray(list(range(1, n + 1)))
+        s = x[0] * x[0]
+        for i in range(1, n):
+            s = s + x[i] * x[(i - 1) % n] + x[i] * x[i]
+        return val(np.array([s])), jac(np.array([s]), x)
+    return run
+
+
+def test_gradient_5(benchmark):
+    benchmark(_make_gradient_fun(5))
+
+
+def test_gradient_10(benchmark):
+    benchmark(_make_gradient_fun(10))
+
+
+def test_gradient_20(benchmark):
+    benchmark(_make_gradient_fun(20))
+
+
 # -- Hessian benchmarks -------------------------------------------------------
 
 def _make_hessian_fun(n):

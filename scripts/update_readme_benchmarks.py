@@ -56,10 +56,25 @@ OVERHEAD_BENCHMARKS = {
 }
 
 HDOVERHEAD_BENCHMARKS = {
-    "Scalar add": {"hd": "test_hd_scalar_add", "dual": "test_scalar_add"},
-    "Scalar mul": {"hd": "test_hd_scalar_mul", "dual": "test_scalar_mul"},
-    "sin": {"hd": "test_hd_sin", "dual": "test_sin"},
-    "exp": {"hd": "test_hd_exp", "dual": "test_exp"},
+    "Scalar add": {"hd": "test_hd_scalar_add", "float": "test_float_add"},
+    "Scalar mul": {"hd": "test_hd_scalar_mul", "float": "test_float_mul"},
+    "sin": {"hd": "test_hd_sin", "float": "test_float_sin"},
+    "exp": {"hd": "test_hd_exp", "float": "test_float_exp"},
+}
+
+GRAD_VS_HESS_BENCHMARKS = {
+    "5 variables": {
+        "gradient": "test_gradient_5",
+        "hessian": "test_hessian_5",
+    },
+    "10 variables": {
+        "gradient": "test_gradient_10",
+        "hessian": "test_hessian_10",
+    },
+    "20 variables": {
+        "gradient": "test_gradient_20",
+        "hessian": "test_hessian_20",
+    },
 }
 
 
@@ -140,19 +155,37 @@ def build_overhead_table(times):
 
 
 def build_hd_overhead_table(times):
-    """Build the HyperDual overhead table vs Dual."""
+    """Build the HyperDual overhead table vs float."""
     lines = [
-        "| Operation | HyperDual | Dual | overhead |",
-        "|-----------|-----------|------|----------|",
+        "| Operation | HyperDual | float | overhead |",
+        "|-----------|-----------|-------|----------|",
     ]
     for label, keys in HDOVERHEAD_BENCHMARKS.items():
         t_hd = times.get(keys["hd"])
-        t_dual = times.get(keys["dual"])
-        if t_hd is None or t_dual is None:
+        t_float = times.get(keys["float"])
+        if t_hd is None or t_float is None:
             continue
-        ratio = t_hd / t_dual
+        ratio = t_hd / t_float
         lines.append(
-            f"| {label} | {format_time(t_hd)} | {format_time(t_dual)} | {ratio:.1f}x |"
+            f"| {label} | {format_time(t_hd)} | {format_time(t_float)} | {ratio:.1f}x |"
+        )
+    return "\n".join(lines)
+
+
+def build_grad_vs_hess_table(times):
+    """Build the gradient vs hessian comparison table."""
+    lines = [
+        "| Size | Gradient (Dual) | Hessian (HyperDual) | ratio |",
+        "|------|-----------------|---------------------|-------|",
+    ]
+    for label, keys in GRAD_VS_HESS_BENCHMARKS.items():
+        t_grad = times.get(keys["gradient"])
+        t_hess = times.get(keys["hessian"])
+        if t_grad is None or t_hess is None:
+            continue
+        ratio = t_hess / t_grad
+        lines.append(
+            f"| {label} | {format_time(t_grad)} | {format_time(t_hess)} | {ratio:.1f}x |"
         )
     return "\n".join(lines)
 
@@ -179,6 +212,7 @@ def patch_readme(times):
     text = patch_section(text, "HESSIAN",
                          build_speedup_table(times, HESSIAN_BENCHMARKS,
                                              ("fastdual", "fin. diff.")))
+    text = patch_section(text, "GRADVSHESS", build_grad_vs_hess_table(times))
 
     README.write_text(text, encoding="utf-8")
 

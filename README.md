@@ -245,16 +245,18 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 | np.sin (100) | 6.9 us | 1.8 us | 3.8x |
 <!-- BENCH:OVERHEAD:END -->
 
-### HyperDual: scalar operations
+### HyperDual: overhead vs plain floats
 
 <!-- BENCH:HDOVERHEAD:START -->
-| Operation | HyperDual | Dual | overhead |
-|-----------|-----------|------|----------|
-| Scalar add | 93 ns | 118 ns | 0.8x |
-| Scalar mul | 92 ns | 121 ns | 0.8x |
-| sin | 102 ns | 147 ns | 0.7x |
-| exp | 101 ns | 146 ns | 0.7x |
+| Operation | HyperDual | float | overhead |
+|-----------|-----------|-------|----------|
+| Scalar add | 93 ns | 96 ns | 1.0x |
+| Scalar mul | 92 ns | 97 ns | 0.9x |
+| sin | 102 ns | 118 ns | 0.9x |
+| exp | 101 ns | 121 ns | 0.8x |
 <!-- BENCH:HDOVERHEAD:END -->
+
+> HyperDual carries 4 fixed doubles — no sparse gradient bookkeeping. Per-element arithmetic is nearly free compared to floats.
 
 ### Jacobian: fastdual vs finite differences
 
@@ -278,6 +280,17 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:HESSIAN:END -->
 
 > Hessians require n(n+1)/2 function evaluations (each with HyperDual arithmetic). For small n, finite differences with simple functions can be competitive. The hyper-dual approach shines when derivatives must be **exact** (no step-size tuning) or when the function involves transcendentals where finite-difference errors grow.
+
+### Gradient vs Hessian
+
+How much more does a Hessian cost compared to a gradient for the same function?
+
+<!-- BENCH:GRADVSHESS:START -->
+| Size | Gradient (Dual) | Hessian (HyperDual) | ratio |
+|------|-----------------|---------------------|-------|
+<!-- BENCH:GRADVSHESS:END -->
+
+> Dual computes the full gradient in a single forward pass but carries a sparse gradient vector that grows with the number of variables. HyperDual uses 4 fixed doubles per element (no per-variable scaling), but needs n(n+1)/2 passes for the full Hessian. The ratio reflects this: Hessians are roughly O(n²) more expensive than gradients.
 
 ## Test
 
