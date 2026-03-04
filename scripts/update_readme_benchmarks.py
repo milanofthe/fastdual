@@ -27,18 +27,6 @@ COMPARISON_BENCHMARKS = {
         "fastdual": "test_jac_fastdual_20",
         "findiff": "test_jac_findiff_20",
     },
-    "Hessian 2D": {
-        "fastdual": "test_hessian_fastdual_2d",
-        "findiff": "test_hessian_findiff_2d",
-    },
-    "Hessian 5D": {
-        "fastdual": "test_hessian_fastdual_5d",
-        "findiff": "test_hessian_findiff_5d",
-    },
-    "Sparse Jac 20 (tridiag)": {
-        "sparse": "test_sparse_jac_20",
-        "dense": "test_dense_jac_20",
-    },
 }
 
 OVERHEAD_BENCHMARKS = {

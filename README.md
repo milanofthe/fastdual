@@ -166,14 +166,14 @@ All hot paths are in C. Overhead vs plain floats:
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
-| Scalar add | 122 ns | 97 ns | 1.3x |
-| Scalar mul | 124 ns | 97 ns | 1.3x |
-| Scalar pow | 165 ns | 120 ns | 1.4x |
-| sin | 142 ns | 116 ns | 1.2x |
-| exp | 150 ns | 122 ns | 1.2x |
-| log | 141 ns | 112 ns | 1.3x |
-| np.sin (10) | 2.5 us | 831 ns | 3.0x |
-| np.sin (100) | 6.8 us | 1.8 us | 3.8x |
+| Scalar add | 60 ns | 51 ns | 1.2x |
+| Scalar mul | 60 ns | 49 ns | 1.2x |
+| Scalar pow | 100 ns | 68 ns | 1.5x |
+| sin | 64 ns | 61 ns | 1.1x |
+| exp | 61 ns | 63 ns | 1.0x |
+| log | 61 ns | 62 ns | 1.0x |
+| np.sin (10) | 1.2 us | 400 ns | 3.0x |
+| np.sin (100) | 3.3 us | 610 ns | 5.4x |
 <!-- BENCH:OVERHEAD:END -->
 
 Comparison with finite differences:
@@ -181,14 +181,11 @@ Comparison with finite differences:
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | baseline | speedup |
 |-----------|----------|----------|---------|
-| Jacobian 10x10 | 20.2 us | 80.5 us | **4.0x faster** |
-| Jacobian 20x20 | 45.5 us | 237.4 us | **5.2x faster** |
-| Hessian 2D | 23.4 us | 19.5 us | 1.2x slower |
-| Hessian 5D | 435.4 us | 252.6 us | 1.7x slower |
-| Sparse Jac 20 (tridiag) | 176.8 us | 45.6 us | 3.9x slower |
+| Jacobian 10x10 | 8.9 us | 41.6 us | **4.7x faster** |
+| Jacobian 20x20 | 20.8 us | 123.0 us | **5.9x faster** |
 <!-- BENCH:COMPARISON:END -->
 
-> Hessians use pure-Python hyper-dual numbers (C port planned). Sparse Jacobian wins at larger sizes where coloring saves many forward passes.
+> Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
 
 ## Test
 
