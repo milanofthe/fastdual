@@ -10,6 +10,173 @@ import warnings
 import numpy as np
 
 
+# ---------------------------------------------------------------------------
+# __array_function__ protocol — dispatch table
+# ---------------------------------------------------------------------------
+
+HANDLED_FUNCTIONS = {}
+
+
+def implements(np_function):
+    """Register an __array_function__ implementation."""
+    def decorator(func):
+        HANDLED_FUNCTIONS[np_function] = func
+        return func
+    return decorator
+
+
+# -- np.dot -----------------------------------------------------------------
+
+@implements(np.dot)
+def _dot(a, b):
+    a = np.asarray(a)
+    b = np.asarray(b)
+    if a.ndim == 1 and b.ndim == 1:
+        # 1D dot product
+        return sum(ai * bi for ai, bi in zip(a, b))
+    if a.ndim == 2 and b.ndim == 2:
+        # 2D matmul
+        n, k = a.shape
+        k2, m = b.shape
+        out = np.empty((n, m), dtype=object)
+        for i in range(n):
+            for j in range(m):
+                out[i, j] = sum(a[i, p] * b[p, j] for p in range(k))
+        return out.view(DualArray)
+    if a.ndim == 2 and b.ndim == 1:
+        # matvec
+        n, k = a.shape
+        out = np.empty(n, dtype=object)
+        for i in range(n):
+            out[i] = sum(a[i, p] * b[p] for p in range(k))
+        return out.view(DualArray)
+    return NotImplemented
+
+
+# -- np.sum -----------------------------------------------------------------
+
+@implements(np.sum)
+def _sum(a, axis=None, dtype=None, out=None, keepdims=False, initial=np._NoValue, where=np._NoValue):
+    a = np.asarray(a)
+    if axis is not None or keepdims or out is not None:
+        return NotImplemented
+    result = a.flat[0]
+    for x in list(a.flat)[1:]:
+        result = result + x
+    return result
+
+
+# -- np.prod ----------------------------------------------------------------
+
+@implements(np.prod)
+def _prod(a, axis=None, dtype=None, out=None, keepdims=False, initial=np._NoValue, where=np._NoValue):
+    a = np.asarray(a)
+    if axis is not None or keepdims or out is not None:
+        return NotImplemented
+    result = a.flat[0]
+    for x in list(a.flat)[1:]:
+        result = result * x
+    return result
+
+
+# -- np.concatenate / np.stack ---------------------------------------------
+
+@implements(np.concatenate)
+def _concatenate(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
+    raw = [np.asarray(a).view(np.ndarray) for a in arrays]
+    result = np.concatenate(raw, axis=axis)
+    if result.dtype == object:
+        return result.view(DualArray)
+    return result
+
+
+@implements(np.stack)
+def _stack(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
+    raw = [np.asarray(a).view(np.ndarray) for a in arrays]
+    result = np.stack(raw, axis=axis)
+    if result.dtype == object:
+        return result.view(DualArray)
+    return result
+
+
+# -- np.linalg.norm ---------------------------------------------------------
+
+@implements(np.linalg.norm)
+def _norm(x, ord=None, axis=None, keepdims=False):
+    x = np.asarray(x)
+    if axis is not None or keepdims:
+        return NotImplemented
+    flat = list(x.flat)
+    if ord is None or ord == 2:
+        # L2 norm: sqrt(sum(x_i^2))
+        s = sum(xi * xi for xi in flat)
+        return s.sqrt() if isinstance(s, Dual) else s ** 0.5
+    if ord == 1:
+        return sum(abs(xi) for xi in flat)
+    if ord == np.inf:
+        return max(flat, key=lambda xi: abs(float(xi)))
+    return NotImplemented
+
+
+# -- np.linalg.solve --------------------------------------------------------
+
+@implements(np.linalg.solve)
+def _solve(a, b):
+    a = np.array(np.asarray(a), dtype=object)
+    b = np.array(np.asarray(b), dtype=object)
+    n = a.shape[0]
+    # Augment [A | b]
+    if b.ndim == 1:
+        aug = np.empty((n, n + 1), dtype=object)
+        aug[:, :n] = a
+        aug[:, n] = b
+        ncols_b = 1
+    else:
+        m = b.shape[1]
+        aug = np.empty((n, n + m), dtype=object)
+        aug[:, :n] = a
+        aug[:, n:] = b
+        ncols_b = m
+
+    # Forward elimination with partial pivoting (pivot on .val)
+    for col in range(n):
+        # Find pivot
+        max_row = col
+        max_val = abs(float(aug[col, col]))
+        for row in range(col + 1, n):
+            v = abs(float(aug[row, col]))
+            if v > max_val:
+                max_val = v
+                max_row = row
+        if max_row != col:
+            aug[[col, max_row]] = aug[[max_row, col]]
+
+        pivot = aug[col, col]
+        for row in range(col + 1, n):
+            factor = aug[row, col] / pivot
+            for j in range(col, aug.shape[1]):
+                aug[row, j] = aug[row, j] - factor * aug[col, j]
+
+    # Back substitution
+    for col in range(n - 1, -1, -1):
+        for row in range(col):
+            factor = aug[row, col] / aug[col, col]
+            for j in range(aug.shape[1]):
+                aug[row, j] = aug[row, j] - factor * aug[col, j]
+        pivot = aug[col, col]
+        for j in range(n, aug.shape[1]):
+            aug[col, j] = aug[col, j] / pivot
+
+    result = aug[:, n:]
+    if ncols_b == 1:
+        return result[:, 0].view(DualArray)
+    return result.view(DualArray)
+
+
+# ---------------------------------------------------------------------------
+# DualArray
+# ---------------------------------------------------------------------------
+
 class DualArray(np.ndarray):
     """ndarray subclass that intercepts ufuncs for C-level batch dispatch.
 
@@ -54,6 +221,13 @@ class DualArray(np.ndarray):
                 return result.view(DualArray)
 
         return self._fallback(ufunc, method, *inputs, **kwargs)
+
+    def __array_function__(self, func, types, args, kwargs):
+        if func in HANDLED_FUNCTIONS:
+            result = HANDLED_FUNCTIONS[func](*args, **kwargs)
+            if result is not NotImplemented:
+                return result
+        return super().__array_function__(func, types, args, kwargs)
 
     def _fallback(self, ufunc, method, *inputs, **kwargs):
         regular = tuple(
