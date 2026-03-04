@@ -235,14 +235,14 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
-| Scalar add | 118 ns | 96 ns | 1.2x |
-| Scalar mul | 121 ns | 97 ns | 1.3x |
-| Scalar pow | 161 ns | 118 ns | 1.4x |
-| sin | 147 ns | 118 ns | 1.2x |
-| exp | 146 ns | 121 ns | 1.2x |
-| log | 131 ns | 114 ns | 1.1x |
-| np.sin (10) | 2.5 us | 841 ns | 3.0x |
-| np.sin (100) | 6.9 us | 1.8 us | 3.8x |
+| Scalar add | 123 ns | 97 ns | 1.3x |
+| Scalar mul | 122 ns | 95 ns | 1.3x |
+| Scalar pow | 164 ns | 121 ns | 1.4x |
+| sin | 140 ns | 116 ns | 1.2x |
+| exp | 149 ns | 123 ns | 1.2x |
+| log | 141 ns | 115 ns | 1.2x |
+| np.sin (10) | 2.5 us | 851 ns | 3.0x |
+| np.sin (100) | 7.0 us | 1.8 us | 3.9x |
 <!-- BENCH:OVERHEAD:END -->
 
 ### HyperDual: overhead vs plain floats
@@ -250,10 +250,10 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:HDOVERHEAD:START -->
 | Operation | HyperDual | float | overhead |
 |-----------|-----------|-------|----------|
-| Scalar add | 93 ns | 96 ns | 1.0x |
-| Scalar mul | 92 ns | 97 ns | 0.9x |
-| sin | 102 ns | 118 ns | 0.9x |
-| exp | 101 ns | 121 ns | 0.8x |
+| Scalar add | 92 ns | 97 ns | 1.0x |
+| Scalar mul | 91 ns | 95 ns | 1.0x |
+| sin | 102 ns | 116 ns | 0.9x |
+| exp | 102 ns | 123 ns | 0.8x |
 <!-- BENCH:HDOVERHEAD:END -->
 
 > HyperDual carries 4 fixed doubles — no sparse gradient bookkeeping. Per-element arithmetic is nearly free compared to floats.
@@ -263,8 +263,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
 |-----------|---|---|---|
-| Jacobian 10x10 | 19.9 us | 80.7 us | **4.0x faster** |
-| Jacobian 20x20 | 45.3 us | 236.0 us | **5.2x faster** |
+| Jacobian 10x10 | 20.1 us | 80.7 us | **4.0x faster** |
+| Jacobian 20x20 | 46.3 us | 240.3 us | **5.2x faster** |
 <!-- BENCH:COMPARISON:END -->
 
 > Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
@@ -274,9 +274,9 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:HESSIAN:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
 |-----------|---|---|---|
-| Hessian 5x5 | 11.1 us | 173.1 us | **15.6x faster** |
-| Hessian 10x10 | 64.4 us | 1.1 ms | **17.0x faster** |
-| Hessian 20x20 | 449.8 us | 7.7 ms | **17.2x faster** |
+| Hessian 5x5 | 11.1 us | 172.5 us | **15.6x faster** |
+| Hessian 10x10 | 60.9 us | 1.1 ms | **17.8x faster** |
+| Hessian 20x20 | 435.7 us | 7.6 ms | **17.4x faster** |
 <!-- BENCH:HESSIAN:END -->
 
 > Hessians require n(n+1)/2 function evaluations (each with HyperDual arithmetic). For small n, finite differences with simple functions can be competitive. The hyper-dual approach shines when derivatives must be **exact** (no step-size tuning) or when the function involves transcendentals where finite-difference errors grow.
@@ -288,6 +288,9 @@ How much more does a Hessian cost compared to a gradient for the same function?
 <!-- BENCH:GRADVSHESS:START -->
 | Size | Gradient (Dual) | Hessian (HyperDual) | ratio |
 |------|-----------------|---------------------|-------|
+| 5 variables | 11.5 us | 11.1 us | 1.0x |
+| 10 variables | 15.2 us | 60.9 us | 4.0x |
+| 20 variables | 22.7 us | 435.7 us | 19.2x |
 <!-- BENCH:GRADVSHESS:END -->
 
 > Dual computes the full gradient in a single forward pass but carries a sparse gradient vector that grows with the number of variables. HyperDual uses 4 fixed doubles per element (no per-variable scaling), but needs n(n+1)/2 passes for the full Hessian. The ratio reflects this: Hessians are roughly O(n²) more expensive than gradients.
