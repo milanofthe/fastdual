@@ -42,16 +42,14 @@ COMPARISON_BENCHMARKS = {
 }
 
 OVERHEAD_BENCHMARKS = {
-    "Scalar add": "test_scalar_add",
-    "Scalar mul": "test_scalar_mul",
-    "Scalar pow": "test_scalar_pow",
-    "sin": "test_sin",
-    "exp": "test_exp",
-    "log": "test_log",
-    "Seed array (10)": "test_seed_array_10",
-    "Seed array (100)": "test_seed_array_100",
-    "np.sin (10)": "test_np_sin_array_10",
-    "np.sin (100)": "test_np_sin_array_100",
+    "Scalar add": {"dual": "test_scalar_add", "float": "test_float_add"},
+    "Scalar mul": {"dual": "test_scalar_mul", "float": "test_float_mul"},
+    "Scalar pow": {"dual": "test_scalar_pow", "float": "test_float_pow"},
+    "sin": {"dual": "test_sin", "float": "test_float_sin"},
+    "exp": {"dual": "test_exp", "float": "test_float_exp"},
+    "log": {"dual": "test_log", "float": "test_float_log"},
+    "np.sin (10)": {"dual": "test_np_sin_array_10", "float": "test_float_np_sin_array_10"},
+    "np.sin (100)": {"dual": "test_np_sin_array_100", "float": "test_float_np_sin_array_100"},
 }
 
 
@@ -113,16 +111,20 @@ def build_comparison_table(times):
 
 
 def build_overhead_table(times):
-    """Build the overhead/raw timing table."""
+    """Build the overhead table with relative cost vs plain floats."""
     lines = [
-        "| Operation | Time |",
-        "|-----------|------|",
+        "| Operation | Dual | float | overhead |",
+        "|-----------|------|-------|----------|",
     ]
-    for label, name in OVERHEAD_BENCHMARKS.items():
-        t = times.get(name)
-        if t is None:
+    for label, keys in OVERHEAD_BENCHMARKS.items():
+        t_dual = times.get(keys["dual"])
+        t_float = times.get(keys["float"])
+        if t_dual is None or t_float is None:
             continue
-        lines.append(f"| {label} | {format_time(t)} |")
+        ratio = t_dual / t_float
+        lines.append(
+            f"| {label} | {format_time(t_dual)} | {format_time(t_float)} | {ratio:.1f}x |"
+        )
     return "\n".join(lines)
 
 

@@ -28,7 +28,7 @@ def _reset():
     reset()
 
 
-# -- Scalar arithmetic -------------------------------------------------------
+# -- Scalar arithmetic (Dual) ------------------------------------------------
 
 def test_scalar_add(benchmark):
     x = Dual(3.0)
@@ -47,7 +47,26 @@ def test_scalar_pow(benchmark):
     benchmark(lambda: x ** 3.0)
 
 
-# -- Transcendentals ---------------------------------------------------------
+# -- Scalar arithmetic (float baseline) -------------------------------------
+
+def test_float_add(benchmark):
+    x = 3.0
+    y = 5.0
+    benchmark(lambda: x + y)
+
+
+def test_float_mul(benchmark):
+    x = 3.0
+    y = 5.0
+    benchmark(lambda: x * y)
+
+
+def test_float_pow(benchmark):
+    x = 2.0
+    benchmark(lambda: x ** 3.0)
+
+
+# -- Transcendentals (Dual) -------------------------------------------------
 
 def test_sin(benchmark):
     x = Dual(1.0)
@@ -64,7 +83,24 @@ def test_log(benchmark):
     benchmark(lambda: x.log())
 
 
-# -- Array operations ---------------------------------------------------------
+# -- Transcendentals (float baseline) ---------------------------------------
+
+def test_float_sin(benchmark):
+    x = 1.0
+    benchmark(lambda: math.sin(x))
+
+
+def test_float_exp(benchmark):
+    x = 1.0
+    benchmark(lambda: math.exp(x))
+
+
+def test_float_log(benchmark):
+    x = 2.0
+    benchmark(lambda: math.log(x))
+
+
+# -- Array operations (Dual) ------------------------------------------------
 
 def test_seed_array_10(benchmark):
     vals = list(range(1, 11))
@@ -89,6 +125,18 @@ def test_np_sin_array_100(benchmark):
 def test_val_extraction_100(benchmark):
     arr = DualArray(list(range(1, 101)))
     benchmark(lambda: val(arr))
+
+
+# -- Array operations (float baseline) --------------------------------------
+
+def test_float_np_sin_array_10(benchmark):
+    arr = np.arange(1.0, 11.0)
+    benchmark(lambda: np.sin(arr))
+
+
+def test_float_np_sin_array_100(benchmark):
+    arr = np.arange(1.0, 101.0)
+    benchmark(lambda: np.sin(arr))
 
 
 # -- Jacobian -----------------------------------------------------------------

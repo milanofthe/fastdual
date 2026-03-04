@@ -164,18 +164,16 @@ np.linalg.solve(A, b)  # linear solve with gradient propagation
 All hot paths are in C. Overhead vs plain floats:
 
 <!-- BENCH:OVERHEAD:START -->
-| Operation | Time |
-|-----------|------|
-| Scalar add | 112 ns |
-| Scalar mul | 110 ns |
-| Scalar pow | 161 ns |
-| sin | 131 ns |
-| exp | 131 ns |
-| log | 120 ns |
-| Seed array (10) | 4.3 us |
-| Seed array (100) | 19.9 us |
-| np.sin (10) | 2.3 us |
-| np.sin (100) | 6.1 us |
+| Operation | Dual | float | overhead |
+|-----------|------|-------|----------|
+| Scalar add | 60 ns | 51 ns | 1.2x |
+| Scalar mul | 60 ns | 50 ns | 1.2x |
+| Scalar pow | 100 ns | 68 ns | 1.5x |
+| sin | 64 ns | 63 ns | 1.0x |
+| exp | 61 ns | 64 ns | 1.0x |
+| log | 62 ns | 61 ns | 1.0x |
+| np.sin (10) | 1.2 us | 400 ns | 3.0x |
+| np.sin (100) | 3.4 us | 600 ns | 5.7x |
 <!-- BENCH:OVERHEAD:END -->
 
 Comparison with finite differences:
@@ -183,11 +181,11 @@ Comparison with finite differences:
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | baseline | speedup |
 |-----------|----------|----------|---------|
-| Jacobian 10x10 | 19.3 us | 75.7 us | **3.9x faster** |
-| Jacobian 20x20 | 43.1 us | 216.2 us | **5.0x faster** |
-| Hessian 2D | 23.0 us | 20.1 us | 1.1x slower |
-| Hessian 5D | 415.4 us | 239.9 us | 1.7x slower |
-| Sparse Jac 20 (tridiag) | 161.8 us | 42.9 us | 3.8x slower |
+| Jacobian 10x10 | 8.9 us | 41.1 us | **4.6x faster** |
+| Jacobian 20x20 | 20.7 us | 122.8 us | **5.9x faster** |
+| Hessian 2D | 12.2 us | 9.8 us | 1.2x slower |
+| Hessian 5D | 222.8 us | 125.8 us | 1.8x slower |
+| Sparse Jac 20 (tridiag) | 79.4 us | 20.6 us | 3.9x slower |
 <!-- BENCH:COMPARISON:END -->
 
 > Hessians use pure-Python hyper-dual numbers (C port planned). Sparse Jacobian wins at larger sizes where coloring saves many forward passes.
