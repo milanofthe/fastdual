@@ -1,3 +1,7 @@
+from importlib.metadata import version as _pkg_version
+
+__version__ = _pkg_version("fastdual")
+
 from ._fastdual import Dual, reset
 from ._fastdual import seed_array as _c_seed_array
 from ._fastdual import val_array as _c_val_array
