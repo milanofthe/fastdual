@@ -235,14 +235,14 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
-| Scalar add | 121 ns | 97 ns | 1.3x |
-| Scalar mul | 120 ns | 97 ns | 1.2x |
-| Scalar pow | 165 ns | 118 ns | 1.4x |
-| sin | 146 ns | 115 ns | 1.3x |
-| exp | 147 ns | 123 ns | 1.2x |
-| log | 137 ns | 116 ns | 1.2x |
-| np.sin (10) | 2.5 us | 831 ns | 3.1x |
-| np.sin (100) | 6.9 us | 1.8 us | 3.9x |
+| Scalar add | 122 ns | 95 ns | 1.3x |
+| Scalar mul | 122 ns | 95 ns | 1.3x |
+| Scalar pow | 164 ns | 119 ns | 1.4x |
+| sin | 250 ns | 118 ns | 2.1x |
+| exp | 152 ns | 121 ns | 1.3x |
+| log | 132 ns | 115 ns | 1.2x |
+| np.sin (10) | 2.5 us | 832 ns | 3.0x |
+| np.sin (100) | 6.9 us | 1.8 us | 3.8x |
 <!-- BENCH:OVERHEAD:END -->
 
 ### HyperDual: scalar operations
@@ -250,10 +250,10 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:HDOVERHEAD:START -->
 | Operation | HyperDual | Dual | overhead |
 |-----------|-----------|------|----------|
-| Scalar add | 106 ns | 121 ns | 0.9x |
-| Scalar mul | 114 ns | 120 ns | 0.9x |
-| sin | 125 ns | 146 ns | 0.9x |
-| exp | 123 ns | 147 ns | 0.8x |
+| Scalar add | 107 ns | 122 ns | 0.9x |
+| Scalar mul | 116 ns | 122 ns | 1.0x |
+| sin | 124 ns | 250 ns | 0.5x |
+| exp | 125 ns | 152 ns | 0.8x |
 <!-- BENCH:HDOVERHEAD:END -->
 
 ### Jacobian: fastdual vs finite differences
@@ -261,8 +261,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
 |-----------|---|---|---|
-| Jacobian 10x10 | 20.4 us | 81.0 us | **4.0x faster** |
-| Jacobian 20x20 | 47.0 us | 240.5 us | **5.1x faster** |
+| Jacobian 10x10 | 20.2 us | 80.8 us | **4.0x faster** |
+| Jacobian 20x20 | 46.0 us | 238.6 us | **5.2x faster** |
 <!-- BENCH:COMPARISON:END -->
 
 > Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
@@ -272,9 +272,9 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:HESSIAN:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
 |-----------|---|---|---|
-| Hessian 5x5 | 15.1 us | 172.1 us | **11.4x faster** |
-| Hessian 10x10 | 91.0 us | 1.1 ms | **12.0x faster** |
-| Hessian 20x20 | 677.0 us | 7.6 ms | **11.2x faster** |
+| Hessian 5x5 | 14.9 us | 172.3 us | **11.6x faster** |
+| Hessian 10x10 | 92.8 us | 1.1 ms | **11.6x faster** |
+| Hessian 20x20 | 656.3 us | 7.6 ms | **11.5x faster** |
 <!-- BENCH:HESSIAN:END -->
 
 > Hessians require n(n+1)/2 function evaluations (each with HyperDual arithmetic). For small n, finite differences with simple functions can be competitive. The hyper-dual approach shines when derivatives must be **exact** (no step-size tuning) or when the function involves transcendentals where finite-difference errors grow.
