@@ -18,7 +18,12 @@ setup(
             "fastdual._fastdual",
             sources=["src/fastdual/_fastdual.c"],
             include_dirs=[np.get_include()],
-        )
+        ),
+        Extension(
+            "fastdual._hyperdual",
+            sources=["src/fastdual/_hyperdual.c"],
+            include_dirs=[np.get_include()],
+        ),
     ],
     package_data={
         "fastdual": ["py.typed", "*.pyi"],
