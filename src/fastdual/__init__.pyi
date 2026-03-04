@@ -7,6 +7,10 @@ import numpy.typing as npt
 
 from ._fastdual import Dual as Dual
 from ._fastdual import reset as reset
+from ._hyperdual import HyperDual as HyperDual
+from ._hessian import hessian as hessian
+from ._optimize import minimize as minimize
+from ._coloring import sparse_jac as sparse_jac
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -24,6 +28,7 @@ class DualArray(np.ndarray):
 
     def __array_finalize__(self, obj: Any) -> None: ...
     def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any: ...
+    def __array_function__(self, func: Any, types: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any: ...
 
 
 def der(result: Dual | npt.NDArray[Any] | float, wrt: Dual) -> float | npt.NDArray[np.float64]: ...
