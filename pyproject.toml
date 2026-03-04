@@ -30,6 +30,7 @@ Issues = "https://github.com/milanofthe/fastdual/issues"
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
 optimize = ["scipy>=1.10"]
+benchmark = ["pytest-benchmark>=4.0"]
 
 [tool.setuptools.package-data]
 fastdual = ["py.typed", "*.pyi"]
