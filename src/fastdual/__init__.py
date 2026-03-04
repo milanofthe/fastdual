@@ -12,6 +12,7 @@ import numpy as np
 from ._optimize import minimize
 from ._hyperdual import HyperDual
 from ._hessian import hessian
+from ._coloring import sparse_jac
 
 
 # ---------------------------------------------------------------------------
