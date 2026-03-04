@@ -29,6 +29,21 @@ COMPARISON_BENCHMARKS = {
     },
 }
 
+HESSIAN_BENCHMARKS = {
+    "Hessian 5x5": {
+        "fastdual": "test_hessian_5",
+        "findiff": "test_hessian_findiff_5",
+    },
+    "Hessian 10x10": {
+        "fastdual": "test_hessian_10",
+        "findiff": "test_hessian_findiff_10",
+    },
+    "Hessian 20x20": {
+        "fastdual": "test_hessian_20",
+        "findiff": "test_hessian_findiff_20",
+    },
+}
+
 OVERHEAD_BENCHMARKS = {
     "Scalar add": {"dual": "test_scalar_add", "float": "test_float_add"},
     "Scalar mul": {"dual": "test_scalar_mul", "float": "test_float_mul"},
@@ -38,6 +53,13 @@ OVERHEAD_BENCHMARKS = {
     "log": {"dual": "test_log", "float": "test_float_log"},
     "np.sin (10)": {"dual": "test_np_sin_array_10", "float": "test_float_np_sin_array_10"},
     "np.sin (100)": {"dual": "test_np_sin_array_100", "float": "test_float_np_sin_array_100"},
+}
+
+HDOVERHEAD_BENCHMARKS = {
+    "Scalar add": {"hd": "test_hd_scalar_add", "dual": "test_scalar_add"},
+    "Scalar mul": {"hd": "test_hd_scalar_mul", "dual": "test_scalar_mul"},
+    "sin": {"hd": "test_hd_sin", "dual": "test_sin"},
+    "exp": {"hd": "test_hd_exp", "dual": "test_exp"},
 }
 
 
@@ -75,13 +97,14 @@ def format_time(seconds):
     return f"{seconds:.2f} s"
 
 
-def build_comparison_table(times):
-    """Build the comparison markdown table."""
+def build_speedup_table(times, benchmarks, header_cols):
+    """Build a comparison table with speedup column."""
+    col1, col2 = header_cols
     lines = [
-        "| Benchmark | fastdual | baseline | speedup |",
-        "|-----------|----------|----------|---------|",
+        f"| Benchmark | {col1} | {col2} | speedup |",
+        f"|-----------|{'---|' * 3}",
     ]
-    for label, keys in COMPARISON_BENCHMARKS.items():
+    for label, keys in benchmarks.items():
         names = list(keys.keys())
         t_fast = times.get(keys[names[0]])
         t_base = times.get(keys[names[1]])
@@ -116,25 +139,46 @@ def build_overhead_table(times):
     return "\n".join(lines)
 
 
-def patch_readme(comparison_table, overhead_table):
-    """Replace content between markers in README.md."""
+def build_hd_overhead_table(times):
+    """Build the HyperDual overhead table vs Dual."""
+    lines = [
+        "| Operation | HyperDual | Dual | overhead |",
+        "|-----------|-----------|------|----------|",
+    ]
+    for label, keys in HDOVERHEAD_BENCHMARKS.items():
+        t_hd = times.get(keys["hd"])
+        t_dual = times.get(keys["dual"])
+        if t_hd is None or t_dual is None:
+            continue
+        ratio = t_hd / t_dual
+        lines.append(
+            f"| {label} | {format_time(t_hd)} | {format_time(t_dual)} | {ratio:.1f}x |"
+        )
+    return "\n".join(lines)
+
+
+def patch_section(text, marker, content):
+    """Replace content between <!-- BENCH:marker:START --> and <!-- BENCH:marker:END -->."""
+    return re.sub(
+        rf"(<!-- BENCH:{marker}:START -->).*?(<!-- BENCH:{marker}:END -->)",
+        rf"\1\n{content}\n\2",
+        text,
+        flags=re.DOTALL,
+    )
+
+
+def patch_readme(times):
+    """Replace all benchmark sections in README.md."""
     text = README.read_text(encoding="utf-8")
 
-    # Patch comparison table
-    text = re.sub(
-        r"(<!-- BENCH:COMPARISON:START -->).*?(<!-- BENCH:COMPARISON:END -->)",
-        rf"\1\n{comparison_table}\n\2",
-        text,
-        flags=re.DOTALL,
-    )
-
-    # Patch overhead table
-    text = re.sub(
-        r"(<!-- BENCH:OVERHEAD:START -->).*?(<!-- BENCH:OVERHEAD:END -->)",
-        rf"\1\n{overhead_table}\n\2",
-        text,
-        flags=re.DOTALL,
-    )
+    text = patch_section(text, "OVERHEAD", build_overhead_table(times))
+    text = patch_section(text, "HDOVERHEAD", build_hd_overhead_table(times))
+    text = patch_section(text, "COMPARISON",
+                         build_speedup_table(times, COMPARISON_BENCHMARKS,
+                                             ("fastdual", "fin. diff.")))
+    text = patch_section(text, "HESSIAN",
+                         build_speedup_table(times, HESSIAN_BENCHMARKS,
+                                             ("fastdual", "fin. diff.")))
 
     README.write_text(text, encoding="utf-8")
 
@@ -144,12 +188,8 @@ def main():
     data = run_benchmarks()
     times = extract_times(data)
 
-    print("Building tables...")
-    comparison = build_comparison_table(times)
-    overhead = build_overhead_table(times)
-
     print("Patching README.md...")
-    patch_readme(comparison, overhead)
+    patch_readme(times)
 
     # Cleanup
     BENCH_JSON.unlink(missing_ok=True)

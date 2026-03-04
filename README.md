@@ -71,7 +71,7 @@ result, J = f(2.0, 3.0)
 
 ## Hessians
 
-Second-order derivatives via hyper-dual numbers:
+Second-order derivatives via hyper-dual numbers (also a C extension):
 
 ```python
 from fastdual import hessian
@@ -134,13 +134,61 @@ np.linalg.solve(A, b)  # linear solve with gradient propagation
 
 ## Supported Operations
 
-**Arithmetic:** `+`, `-`, `*`, `/`, `**`, `abs`, unary `-`/`+`
+Both `Dual` (first-order) and `HyperDual` (second-order) types are C extensions supporting the same operations.
 
-**Transcendentals (25):** `sin`, `cos`, `tan`, `exp`, `log`, `log2`, `log10`, `sqrt`, `arcsin`, `arccos`, `arctan`, `sinh`, `cosh`, `tanh`, `arcsinh`, `arccosh`, `arctanh`, `exp2`, `log1p`, `expm1`, `square`, `cbrt`, `sign`, `conjugate`, `negative`
+### Arithmetic
 
-**NumPy:** All of the above work as `np.sin(dual)`, `np.exp(dual)`, etc. — both on scalars and arrays. Array operations are batch-dispatched to C via `DualArray`.
+| Operation | Syntax | Dual | HyperDual |
+|-----------|--------|:----:|:---------:|
+| Addition | `a + b` | yes | yes |
+| Subtraction | `a - b` | yes | yes |
+| Multiplication | `a * b` | yes | yes |
+| Division | `a / b` | yes | yes |
+| Power | `a ** b` | yes | yes |
+| Negation | `-a` | yes | yes |
+| Absolute value | `abs(a)` | yes | yes |
 
-**Comparisons:** `<`, `<=`, `==`, `!=`, `>`, `>=` (compare primal values)
+### Transcendental Functions
+
+All available as methods (`.sin()`) and via NumPy (`np.sin()`) on `Dual`. On `HyperDual`, available as methods.
+
+| Function | Method | Derivative |
+|----------|--------|------------|
+| `sin` | `.sin()` | cos(x) |
+| `cos` | `.cos()` | -sin(x) |
+| `tan` | `.tan()` | sec²(x) |
+| `exp` | `.exp()` | exp(x) |
+| `log` | `.log()` | 1/x |
+| `sqrt` | `.sqrt()` | 1/(2√x) |
+| `arcsin` | `.arcsin()` | 1/√(1-x²) |
+| `arccos` | `.arccos()` | -1/√(1-x²) |
+| `arctan` | `.arctan()` | 1/(1+x²) |
+| `sinh` | `.sinh()` | cosh(x) |
+| `cosh` | `.cosh()` | sinh(x) |
+| `tanh` | `.tanh()` | sech²(x) |
+| `arcsinh` | `.arcsinh()` | 1/√(1+x²) |
+| `arccosh` | `.arccosh()` | 1/√(x²-1) |
+| `arctanh` | `.arctanh()` | 1/(1-x²) |
+| `exp2` | `.exp2()` | ln(2)·2ˣ |
+| `log2` | `.log2()` | 1/(x·ln2) |
+| `log10` | `.log10()` | 1/(x·ln10) |
+| `log1p` | `.log1p()` | 1/(1+x) |
+| `expm1` | `.expm1()` | exp(x) |
+| `square` | `.square()` | 2x |
+| `cbrt` | `.cbrt()` | 1/(3x^⅔) |
+
+### Utility Functions
+
+| Function | Method | Description |
+|----------|--------|-------------|
+| `sign` | `.sign()` | Sign function (derivative = 0) |
+| `conjugate` | `.conjugate()` | Complex conjugate (identity for reals) |
+| `floor` | `.floor()` | Floor (derivative = 0) |
+| `ceil` | `.ceil()` | Ceiling (derivative = 0) |
+
+### Comparisons
+
+`<`, `<=`, `==`, `!=`, `>`, `>=` — compare on primal value only.
 
 ## API Reference
 
@@ -153,39 +201,64 @@ np.linalg.solve(A, b)  # linear solve with gradient propagation
 | `val(array)` | Extract primal values from Dual array |
 | `jac(results, seeds)` | Full Jacobian matrix |
 | `autojac(fn)` | Decorator: `fn(*floats) -> (values, jacobian)` |
+| `HyperDual(f, f1, f2, f12)` | Hyper-dual number for second derivatives |
 | `hessian(fn, x)` | Hessian matrix via hyper-dual numbers |
 | `minimize(fn, x0)` | scipy.optimize with automatic gradients |
 | `sparse_jac(fn, x, sparsity)` | Sparse Jacobian via graph coloring |
-| `HyperDual(f, f1, f2, f12)` | Hyper-dual number for second derivatives |
 | `reset()` | Reset variable ID counter |
 
 ## Performance
 
-All hot paths are in C. Overhead vs plain floats:
+All hot paths are in C — both `Dual` and `HyperDual` types are C extensions with zero Python object allocation in the inner loop.
+
+### Dual: overhead vs plain floats
 
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
-| Scalar add | 121 ns | 94 ns | 1.3x |
-| Scalar mul | 123 ns | 99 ns | 1.2x |
-| Scalar pow | 165 ns | 124 ns | 1.3x |
-| sin | 143 ns | 119 ns | 1.2x |
-| exp | 152 ns | 121 ns | 1.3x |
-| log | 133 ns | 115 ns | 1.2x |
-| np.sin (10) | 2.5 us | 832 ns | 3.0x |
-| np.sin (100) | 6.9 us | 1.8 us | 3.8x |
+| Scalar add | 60 ns | 51 ns | 1.2x |
+| Scalar mul | 60 ns | 50 ns | 1.2x |
+| Scalar pow | 100 ns | 68 ns | 1.5x |
+| sin | 64 ns | 61 ns | 1.0x |
+| exp | 62 ns | 64 ns | 1.0x |
+| log | 62 ns | 62 ns | 1.0x |
+| np.sin (10) | 1.2 us | 400 ns | 3.0x |
+| np.sin (100) | 3.3 us | 605 ns | 5.5x |
 <!-- BENCH:OVERHEAD:END -->
 
-Comparison with finite differences:
+### HyperDual: scalar operations
+
+<!-- BENCH:HDOVERHEAD:START -->
+| Operation | HyperDual | Dual | overhead |
+|-----------|-----------|------|----------|
+| Scalar add | 290 ns | 60 ns | 4.9x |
+| Scalar mul | 365 ns | 60 ns | 6.1x |
+| sin | 400 ns | 64 ns | 6.2x |
+| exp | 285 ns | 62 ns | 4.6x |
+<!-- BENCH:HDOVERHEAD:END -->
+
+### Jacobian: fastdual vs finite differences
 
 <!-- BENCH:COMPARISON:START -->
-| Benchmark | fastdual | baseline | speedup |
-|-----------|----------|----------|---------|
-| Jacobian 10x10 | 20.2 us | 80.9 us | **4.0x faster** |
-| Jacobian 20x20 | 45.8 us | 239.5 us | **5.2x faster** |
+| Benchmark | fastdual | fin. diff. | speedup |
+|-----------|---|---|---|
+| Jacobian 10x10 | 8.9 us | 41.0 us | **4.6x faster** |
+| Jacobian 20x20 | 20.7 us | 121.5 us | **5.9x faster** |
 <!-- BENCH:COMPARISON:END -->
 
 > Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
+
+### Hessian: fastdual vs finite differences
+
+<!-- BENCH:HESSIAN:START -->
+| Benchmark | fastdual | fin. diff. | speedup |
+|-----------|---|---|---|
+| Hessian 5x5 | 97.5 us | 87.6 us | 1.1x slower |
+| Hessian 10x10 | 729.1 us | 551.0 us | 1.3x slower |
+| Hessian 20x20 | 6.0 ms | 3.9 ms | 1.5x slower |
+<!-- BENCH:HESSIAN:END -->
+
+> Hessians require n(n+1)/2 function evaluations (each with HyperDual arithmetic). For small n, finite differences with simple functions can be competitive. The hyper-dual approach shines when derivatives must be **exact** (no step-size tuning) or when the function involves transcendentals where finite-difference errors grow.
 
 ## Test
 
