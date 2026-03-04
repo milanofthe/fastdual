@@ -166,14 +166,14 @@ All hot paths are in C. Overhead vs plain floats:
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
-| Scalar add | 119 ns | 96 ns | 1.2x |
-| Scalar mul | 121 ns | 94 ns | 1.3x |
-| Scalar pow | 164 ns | 119 ns | 1.4x |
-| sin | 141 ns | 119 ns | 1.2x |
-| exp | 149 ns | 122 ns | 1.2x |
+| Scalar add | 121 ns | 94 ns | 1.3x |
+| Scalar mul | 123 ns | 99 ns | 1.2x |
+| Scalar pow | 165 ns | 124 ns | 1.3x |
+| sin | 143 ns | 119 ns | 1.2x |
+| exp | 152 ns | 121 ns | 1.3x |
 | log | 133 ns | 115 ns | 1.2x |
-| np.sin (10) | 2.5 us | 822 ns | 3.0x |
-| np.sin (100) | 6.9 us | 1.8 us | 3.9x |
+| np.sin (10) | 2.5 us | 832 ns | 3.0x |
+| np.sin (100) | 6.9 us | 1.8 us | 3.8x |
 <!-- BENCH:OVERHEAD:END -->
 
 Comparison with finite differences:
@@ -181,8 +181,8 @@ Comparison with finite differences:
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | baseline | speedup |
 |-----------|----------|----------|---------|
-| Jacobian 10x10 | 20.0 us | 82.1 us | **4.1x faster** |
-| Jacobian 20x20 | 45.6 us | 239.2 us | **5.2x faster** |
+| Jacobian 10x10 | 20.2 us | 80.9 us | **4.0x faster** |
+| Jacobian 20x20 | 45.8 us | 239.5 us | **5.2x faster** |
 <!-- BENCH:COMPARISON:END -->
 
 > Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
