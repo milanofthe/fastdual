@@ -118,3 +118,87 @@ class TestSparseJac:
         J_dense = jac(result, seeds)
 
         np.testing.assert_allclose(J, J_dense, atol=1e-12)
+
+    def test_large_tridiagonal(self):
+        # n=20 tridiagonal system — should need only ~3 colors
+        n = 20
+
+        def f(x):
+            out = [x[0] + x[1]]
+            for i in range(1, n - 1):
+                out.append(x[i - 1] + x[i] + x[i + 1])
+            out.append(x[n - 2] + x[n - 1])
+            return np.array(out)
+
+        x0 = np.random.RandomState(42).randn(n).tolist()
+        sparsity = np.zeros((n, n), dtype=bool)
+        for i in range(n):
+            sparsity[i, i] = True
+            if i > 0:
+                sparsity[i, i - 1] = True
+            if i < n - 1:
+                sparsity[i, i + 1] = True
+
+        J = sparse_jac(f, x0, sparsity)
+
+        seeds = DualArray(x0)
+        result = f(seeds)
+        J_dense = jac(result, seeds)
+
+        np.testing.assert_allclose(J, J_dense, atol=1e-12)
+
+        # Verify coloring is efficient
+        colors = _greedy_color(sparsity, n)
+        assert max(colors) + 1 <= 3
+
+    def test_block_diagonal(self):
+        # Two 3x3 dense blocks — should need 3 colors
+        def f(x):
+            return np.array([
+                x[0] * x[1] + x[2],
+                x[0] + x[1] * x[2],
+                x[0] * x[2] + x[1],
+                x[3] * x[4] + x[5],
+                x[3] + x[4] * x[5],
+                x[3] * x[5] + x[4],
+            ])
+
+        x0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        sparsity = np.zeros((6, 6), dtype=bool)
+        sparsity[:3, :3] = True
+        sparsity[3:, 3:] = True
+
+        J = sparse_jac(f, x0, sparsity)
+
+        seeds = DualArray(x0)
+        result = f(seeds)
+        J_dense = jac(result, seeds)
+
+        np.testing.assert_allclose(J, J_dense, atol=1e-12)
+
+        colors = _greedy_color(sparsity, 6)
+        assert max(colors) + 1 <= 3
+
+    def test_arrow_sparsity(self):
+        # Arrow pattern: first row/column dense, rest diagonal
+        n = 10
+
+        def f(x):
+            out = [sum(x[j] for j in range(n))]
+            for i in range(1, n):
+                out.append(x[0] + x[i])
+            return np.array(out)
+
+        x0 = list(range(1, n + 1))
+        x0 = [float(v) for v in x0]
+        sparsity = np.eye(n, dtype=bool)
+        sparsity[0, :] = True
+        sparsity[:, 0] = True
+
+        J = sparse_jac(f, x0, sparsity)
+
+        seeds = DualArray(x0)
+        result = f(seeds)
+        J_dense = jac(result, seeds)
+
+        np.testing.assert_allclose(J, J_dense, atol=1e-12)

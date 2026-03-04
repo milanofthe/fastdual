@@ -187,6 +187,96 @@ class TestHyperDualTranscendentals:
         assert z.f12 == pytest.approx(e)
 
 
+class TestHyperDualDivision:
+    def test_hyperdual_over_hyperdual(self):
+        # f(x,y) = x/y, d²f/dxdy = -1/y^2
+        x = HyperDual(6.0, 1.0, 0.0, 0.0)
+        y = HyperDual(3.0, 0.0, 1.0, 0.0)
+        z = x / y
+        assert z.f == pytest.approx(2.0)
+        assert z.f1 == pytest.approx(1.0 / 3.0)     # 1/y
+        assert z.f2 == pytest.approx(-6.0 / 9.0)     # -x/y^2
+        assert z.f12 == pytest.approx(-1.0 / 9.0)    # -1/y^2
+
+    def test_self_division(self):
+        # f(x) = x/x = 1, all derivatives 0
+        x = HyperDual(5.0, 1.0, 1.0, 0.0)
+        z = x / x
+        assert z.f == pytest.approx(1.0)
+        assert z.f1 == pytest.approx(0.0)
+        assert z.f12 == pytest.approx(0.0)
+
+
+class TestHyperDualEdgeCases:
+    def test_arcsin_near_boundary(self):
+        x = HyperDual(0.99, 1.0, 1.0, 0.0)
+        z = x.arcsin()
+        assert z.f == pytest.approx(math.asin(0.99))
+        assert z.f1 == pytest.approx(1.0 / math.sqrt(1 - 0.99**2), rel=1e-6)
+
+    def test_arccos_near_boundary(self):
+        x = HyperDual(-0.99, 1.0, 1.0, 0.0)
+        z = x.arccos()
+        assert z.f == pytest.approx(math.acos(-0.99))
+        assert z.f1 == pytest.approx(-1.0 / math.sqrt(1 - 0.99**2), rel=1e-6)
+
+    def test_log_small_value(self):
+        x = HyperDual(1e-8, 1.0, 1.0, 0.0)
+        z = x.log()
+        assert z.f == pytest.approx(math.log(1e-8))
+        assert z.f1 == pytest.approx(1e8)
+        assert z.f12 == pytest.approx(-1e16)
+
+    def test_sqrt_small_value(self):
+        x = HyperDual(1e-10, 1.0, 1.0, 0.0)
+        z = x.sqrt()
+        assert z.f == pytest.approx(1e-5)
+        assert z.f1 == pytest.approx(0.5e5)
+
+    def test_exp_large_value(self):
+        x = HyperDual(50.0, 1.0, 1.0, 0.0)
+        z = x.exp()
+        e = math.exp(50.0)
+        assert z.f == pytest.approx(e, rel=1e-10)
+        assert z.f12 == pytest.approx(e, rel=1e-10)
+
+    def test_rpow_base_e(self):
+        # e^x, f'' = e^x
+        x = HyperDual(2.0, 1.0, 1.0, 0.0)
+        z = math.e ** x
+        e2 = math.exp(2.0)
+        assert z.f == pytest.approx(e2)
+        assert z.f12 == pytest.approx(e2)
+
+    def test_chain_composition(self):
+        # f(x) = sin(exp(x)), verify chain rule for second derivative
+        # f' = cos(e^x) * e^x
+        # f'' = -sin(e^x) * e^(2x) + cos(e^x) * e^x
+        x = HyperDual(0.5, 1.0, 1.0, 0.0)
+        z = x.exp().sin()
+        ex = math.exp(0.5)
+        expected_f12 = -math.sin(ex) * ex**2 + math.cos(ex) * ex
+        assert z.f12 == pytest.approx(expected_f12, rel=1e-10)
+
+    def test_abs_negative(self):
+        x = HyperDual(-3.0, 1.0, 2.0, 0.5)
+        z = abs(x)
+        assert z.f == pytest.approx(3.0)
+        assert z.f1 == pytest.approx(-1.0)
+        assert z.f2 == pytest.approx(-2.0)
+        assert z.f12 == pytest.approx(-0.5)
+
+    def test_comparison_operators(self):
+        a = HyperDual(2.0)
+        b = HyperDual(3.0)
+        assert a < b
+        assert a <= b
+        assert b > a
+        assert b >= a
+        assert a == 2.0
+        assert a != 3.0
+
+
 class TestHessian:
     def test_quadratic(self):
         # f(x) = x0^2 + x1^2, H = [[2, 0], [0, 2]]

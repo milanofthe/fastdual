@@ -177,3 +177,52 @@ class TestLinalgSolve:
         x = np.linalg.solve(A, b)
         assert float(x[0]) == pytest.approx(0.5)
         assert der(x[0], a) == pytest.approx(-0.25)  # -1/4
+
+    def test_4x4(self):
+        A_vals = [
+            [4.0, 1.0, 0.0, 0.0],
+            [1.0, 4.0, 1.0, 0.0],
+            [0.0, 1.0, 4.0, 1.0],
+            [0.0, 0.0, 1.0, 4.0],
+        ]
+        b_vals = [1.0, 2.0, 3.0, 4.0]
+        A = DualArray(A_vals)
+        b = DualArray(b_vals)
+        x = np.linalg.solve(A, b)
+        v = val(x)
+        expected = np.linalg.solve(np.array(A_vals), np.array(b_vals))
+        np.testing.assert_allclose(v, expected, atol=1e-10)
+
+    def test_hilbert_matrix(self):
+        # Hilbert matrix — ill-conditioned but small enough to be solvable
+        n = 4
+        A_vals = [[1.0 / (i + j + 1) for j in range(n)] for i in range(n)]
+        b_vals = [1.0] * n
+        A = DualArray(A_vals)
+        b = DualArray(b_vals)
+        x = np.linalg.solve(A, b)
+        v = val(x)
+        expected = np.linalg.solve(np.array(A_vals), np.array(b_vals))
+        np.testing.assert_allclose(v, expected, rtol=1e-6)
+
+    def test_solve_rhs_matrix(self):
+        # Solve A X = B where B has multiple columns
+        A_vals = [[2.0, 1.0], [1.0, 3.0]]
+        B_vals = [[1.0, 0.0], [0.0, 1.0]]  # identity RHS
+        A = DualArray(A_vals)
+        B = DualArray(B_vals)
+        X = np.linalg.solve(A, B)
+        v = val(X)
+        expected = np.linalg.solve(np.array(A_vals), np.array(B_vals))
+        np.testing.assert_allclose(v, expected, atol=1e-12)
+
+    def test_solve_needs_pivoting(self):
+        # First row has small pivot, needs row swap
+        A_vals = [[1e-12, 1.0], [1.0, 1.0]]
+        b_vals = [1.0, 2.0]
+        A = DualArray(A_vals)
+        b = DualArray(b_vals)
+        x = np.linalg.solve(A, b)
+        v = val(x)
+        expected = np.linalg.solve(np.array(A_vals), np.array(b_vals))
+        np.testing.assert_allclose(v, expected, rtol=1e-6)
