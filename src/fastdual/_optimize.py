@@ -3,12 +3,12 @@
 import numpy as np
 
 
-def minimize(fun, x0, method='L-BFGS-B', **kwargs):
-    """Minimize a scalar function using automatic gradients.
+def minimize(fun, x0, method=None, hess=False, **kwargs):
+    """Minimize a scalar function using automatic derivatives.
 
-    Wraps ``scipy.optimize.minimize`` with automatic gradient computation
-    via forward-mode AD. The function ``fun`` should accept a DualArray and
-    return a scalar Dual.
+    Wraps ``scipy.optimize.minimize`` with automatic gradient (and optionally
+    Hessian) computation via forward-mode AD. The function ``fun`` should
+    accept a DualArray and return a scalar Dual.
 
     Parameters
     ----------
@@ -16,8 +16,12 @@ def minimize(fun, x0, method='L-BFGS-B', **kwargs):
         Objective function ``f(x) -> scalar``. Will be called with a DualArray.
     x0 : array_like
         Initial guess.
-    method : str
-        Optimization method (default ``'L-BFGS-B'``).
+    method : str, optional
+        Optimization method. Defaults to ``'L-BFGS-B'`` without Hessian,
+        ``'trust-ncg'`` with Hessian.
+    hess : bool
+        If True, compute exact Hessians via hyper-dual numbers and use a
+        second-order method. Default False.
     **kwargs
         Additional keyword arguments passed to ``scipy.optimize.minimize``.
 
@@ -33,9 +37,13 @@ def minimize(fun, x0, method='L-BFGS-B', **kwargs):
             "Install it with: pip install fastdual[optimize]"
         )
 
-    from . import DualArray, val
+    from . import DualArray
+    from ._hyperdual import hessian_matrix
 
     x0 = np.asarray(x0, dtype=float).ravel()
+
+    if method is None:
+        method = 'trust-ncg' if hess else 'L-BFGS-B'
 
     def fun_and_grad(x):
         seeds = DualArray(x)
@@ -44,4 +52,13 @@ def minimize(fun, x0, method='L-BFGS-B', **kwargs):
         grad = np.array([result.der(seeds[i]) for i in range(len(x))])
         return f_val, grad
 
-    return sp_minimize(fun_and_grad, x0, method=method, jac=True, **kwargs)
+    hess_callback = None
+    if hess:
+        def hess_callback(x):
+            def array_fun(hd_list):
+                return fun(np.asarray(hd_list, dtype=object))
+            return hessian_matrix(array_fun, np.asarray(x, dtype=float).ravel())
+
+    return sp_minimize(
+        fun_and_grad, x0, method=method, jac=True, hess=hess_callback, **kwargs
+    )

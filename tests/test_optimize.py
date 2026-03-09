@@ -63,3 +63,48 @@ class TestMinimize:
         result = minimize(f, x0)
         assert result.success
         np.testing.assert_allclose(result.x, np.zeros(10), atol=1e-5)
+
+
+class TestMinimizeHessian:
+    def test_rosenbrock_hess(self):
+        def rosenbrock(x):
+            return (1.0 - x[0]) ** 2 + 100.0 * (x[1] - x[0] ** 2) ** 2
+
+        result = minimize(rosenbrock, [0.0, 0.0], hess=True)
+        assert result.success
+        np.testing.assert_allclose(result.x, [1.0, 1.0], atol=1e-3)
+
+    def test_quadratic_hess(self):
+        def f(x):
+            return x[0] ** 2 + x[1] ** 2
+
+        result = minimize(f, [3.0, 4.0], hess=True)
+        assert result.success
+        np.testing.assert_allclose(result.x, [0.0, 0.0], atol=1e-6)
+
+    def test_hess_fewer_iterations(self):
+        """Second-order method should converge in fewer iterations."""
+        def rosenbrock(x):
+            return (1.0 - x[0]) ** 2 + 100.0 * (x[1] - x[0] ** 2) ** 2
+
+        result_1st = minimize(rosenbrock, [-1.0, -1.0])
+        result_2nd = minimize(rosenbrock, [-1.0, -1.0], hess=True)
+        assert result_2nd.success
+        assert result_2nd.nit <= result_1st.nit
+
+    def test_hess_with_method(self):
+        def f(x):
+            return (x[0] - 1.0) ** 2 + (x[1] + 2.0) ** 2
+
+        result = minimize(f, [0.0, 0.0], method='Newton-CG', hess=True)
+        assert result.success
+        np.testing.assert_allclose(result.x, [1.0, -2.0], atol=1e-6)
+
+    def test_hess_higher_dimensional(self):
+        def f(x):
+            return np.sum(x * x)
+
+        x0 = np.ones(10)
+        result = minimize(f, x0, hess=True)
+        assert result.success
+        np.testing.assert_allclose(result.x, np.zeros(10), atol=1e-5)

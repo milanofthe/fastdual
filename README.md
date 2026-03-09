@@ -100,6 +100,13 @@ result = minimize(objective, [0.0, 0.0])
 print(result.x)  # [1.0, 1.0]
 ```
 
+Pass `hess=True` for exact Hessians via hyper-dual numbers, enabling second-order
+methods (`trust-ncg`, `Newton-CG`, etc.) that converge in fewer iterations:
+
+```python
+result = minimize(objective, [0.0, 0.0], hess=True)
+```
+
 Requires `pip install fastdual[optimize]`.
 
 ## Sparse Jacobians
