@@ -3,7 +3,7 @@
 import pytest
 import math
 import numpy as np
-from fastdual import HyperDual, hessian
+from fastdual import HyperDual, autohess
 
 
 class TestHyperDualArithmetic:
@@ -280,46 +280,54 @@ class TestHyperDualEdgeCases:
 class TestHessian:
     def test_quadratic(self):
         # f(x) = x0^2 + x1^2, H = [[2, 0], [0, 2]]
-        def f(x):
-            return x[0] ** 2.0 + x[1] ** 2.0
+        @autohess
+        def f(x, y):
+            return x ** 2.0 + y ** 2.0
 
-        H = hessian(f, [1.0, 1.0])
+        result, H = f(1.0, 1.0)
+        assert result == pytest.approx(2.0)
         np.testing.assert_allclose(H, [[2.0, 0.0], [0.0, 2.0]], atol=1e-12)
 
     def test_mixed_quadratic(self):
         # f(x) = x0*x1, H = [[0, 1], [1, 0]]
-        def f(x):
-            return x[0] * x[1]
+        @autohess
+        def f(x, y):
+            return x * y
 
-        H = hessian(f, [2.0, 3.0])
+        result, H = f(2.0, 3.0)
+        assert result == pytest.approx(6.0)
         np.testing.assert_allclose(H, [[0.0, 1.0], [1.0, 0.0]], atol=1e-12)
 
     def test_rosenbrock(self):
         # f(x,y) = (1-x)^2 + 100*(y-x^2)^2
         # H = [[2 + 1200*x^2 - 400*y, -400*x],
         #       [-400*x, 200]]
-        def rosenbrock(x):
-            return (1.0 - x[0]) ** 2.0 + 100.0 * (x[1] - x[0] ** 2.0) ** 2.0
+        @autohess
+        def rosenbrock(x, y):
+            return (1.0 - x) ** 2.0 + 100.0 * (y - x ** 2.0) ** 2.0
 
-        x0 = [1.0, 1.0]
-        H = hessian(rosenbrock, x0)
+        result, H = rosenbrock(1.0, 1.0)
+        assert result == pytest.approx(0.0)
         expected = [[802.0, -400.0], [-400.0, 200.0]]
         np.testing.assert_allclose(H, expected, atol=1e-10)
 
     def test_symmetry(self):
-        def f(x):
-            return x[0] ** 2.0 * x[1] + x[1] ** 3.0
+        @autohess
+        def f(x, y):
+            return x ** 2.0 * y + y ** 3.0
 
-        H = hessian(f, [2.0, 3.0])
+        _, H = f(2.0, 3.0)
         np.testing.assert_allclose(H, H.T, atol=1e-12)
 
     def test_3d(self):
         # f(x) = x0*x1*x2
         # H = [[0, x2, x1], [x2, 0, x0], [x1, x0, 0]]
-        def f(x):
-            return x[0] * x[1] * x[2]
+        @autohess
+        def f(x, y, z):
+            return x * y * z
 
-        H = hessian(f, [2.0, 3.0, 4.0])
+        result, H = f(2.0, 3.0, 4.0)
+        assert result == pytest.approx(24.0)
         expected = [[0, 4, 3], [4, 0, 2], [3, 2, 0]]
         np.testing.assert_allclose(H, expected, atol=1e-12)
 
@@ -327,11 +335,12 @@ class TestHessian:
         # f(x) = sin(x0) * exp(x1)
         # H = [[-sin(x0)*exp(x1), cos(x0)*exp(x1)],
         #      [cos(x0)*exp(x1),  sin(x0)*exp(x1)]]
-        def f(x):
-            return x[0].sin() * x[1].exp()
+        @autohess
+        def f(x, y):
+            return x.sin() * y.exp()
 
-        x0 = [1.0, 0.0]
-        H = hessian(f, x0)
+        result, H = f(1.0, 0.0)
+        assert result == pytest.approx(math.sin(1.0))
         expected = [
             [-math.sin(1.0), math.cos(1.0)],
             [math.cos(1.0), math.sin(1.0)],

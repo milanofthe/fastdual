@@ -69,19 +69,21 @@ result, J = f(2.0, 3.0)
 #      [9.0, 12.0]]
 ```
 
-## Hessians
+## Automatic Hessians
 
 Second-order derivatives via hyper-dual numbers (also a C extension):
 
 ```python
-from fastdual import hessian
+from fastdual import autohess
 
-def rosenbrock(x):
-    return (1.0 - x[0])**2 + 100.0 * (x[1] - x[0]**2)**2
+@autohess
+def rosenbrock(x, y):
+    return (1.0 - x)**2 + 100.0 * (y - x**2)**2
 
-H = hessian(rosenbrock, [1.0, 1.0])
-# [[802, -400],
-#  [-400, 200]]
+result, H = rosenbrock(1.0, 1.0)
+# result = 0.0
+# H = [[802, -400],
+#      [-400, 200]]
 ```
 
 ## Optimization
@@ -221,7 +223,7 @@ These are available via NumPy ufuncs on `Dual`/`DualArray`.
 | `jac(results, seeds)` | Full Jacobian matrix |
 | `autojac(fn)` | Decorator: `fn(*floats) -> (values, jacobian)` |
 | `HyperDual(f, f1, f2, f12)` | Hyper-dual number for second derivatives |
-| `hessian(fn, x)` | Hessian matrix via hyper-dual numbers |
+| `@autohess` | Decorator returning `(result, hessian)` via hyper-dual numbers |
 | `minimize(fn, x0)` | scipy.optimize with automatic gradients |
 | `sparse_jac(fn, x, sparsity)` | Sparse Jacobian via graph coloring |
 | `reset()` | Reset variable ID counter |

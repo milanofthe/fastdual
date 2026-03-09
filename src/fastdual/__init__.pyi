@@ -8,7 +8,7 @@ import numpy.typing as npt
 from ._fastdual import Dual as Dual
 from ._fastdual import reset as reset
 from ._hyperdual import HyperDual as HyperDual
-from ._hessian import hessian as hessian
+from ._hessian import autohess as autohess
 from ._optimize import minimize as minimize
 from ._coloring import sparse_jac as sparse_jac
 
@@ -42,3 +42,5 @@ def seed_array(values: list[float] | tuple[float, ...] | npt.NDArray[Any]) -> Du
 def val(arr: npt.NDArray[Any] | list[Dual]) -> npt.NDArray[np.float64]: ...
 
 def autojac(fnc: _F) -> Callable[..., tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]: ...
+
+def autohess(fnc: _F) -> Callable[..., tuple[float, npt.NDArray[np.float64]]]: ...

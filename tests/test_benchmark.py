@@ -13,7 +13,7 @@ except ImportError:
     pass
 
 import pytest
-from fastdual import Dual, DualArray, HyperDual, der, jac, val, hessian, reset
+from fastdual import Dual, DualArray, HyperDual, der, jac, val, autohess, reset
 
 
 pytestmark = pytest.mark.skipif(
@@ -269,30 +269,30 @@ def test_gradient_20(benchmark):
 # -- Hessian benchmarks -------------------------------------------------------
 
 def _make_hessian_fun(n):
-    def f(x):
+    def f(*x):
         s = x[0] * x[0]
         for i in range(1, n):
             s = s + x[i] * x[(i - 1) % n] + x[i] * x[i]
         return s
-    return f
+    return autohess(f)
 
 
 def test_hessian_5(benchmark):
     f = _make_hessian_fun(5)
     x0 = list(range(1, 6))
-    benchmark(lambda: hessian(f, x0))
+    benchmark(lambda: f(*x0))
 
 
 def test_hessian_10(benchmark):
     f = _make_hessian_fun(10)
     x0 = list(range(1, 11))
-    benchmark(lambda: hessian(f, x0))
+    benchmark(lambda: f(*x0))
 
 
 def test_hessian_20(benchmark):
     f = _make_hessian_fun(20)
     x0 = list(range(1, 21))
-    benchmark(lambda: hessian(f, x0))
+    benchmark(lambda: f(*x0))
 
 
 def _hessian_findiff(fun, x0, eps=1e-5):
