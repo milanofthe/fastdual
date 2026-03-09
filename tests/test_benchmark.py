@@ -268,13 +268,17 @@ def test_gradient_20(benchmark):
 
 # -- Hessian benchmarks -------------------------------------------------------
 
-def _make_hessian_fun(n):
+def _make_hessian_raw(n):
     def f(*x):
         s = x[0] * x[0]
         for i in range(1, n):
             s = s + x[i] * x[(i - 1) % n] + x[i] * x[i]
         return s
-    return autohess(f)
+    return f
+
+
+def _make_hessian_fun(n):
+    return autohess(_make_hessian_raw(n))
 
 
 def test_hessian_5(benchmark):
@@ -300,31 +304,30 @@ def _hessian_findiff(fun, x0, eps=1e-5):
     x0 = np.array(x0, dtype=float)
     n = len(x0)
     H = np.empty((n, n))
-    f0 = fun(x0)
     for i in range(n):
         for j in range(i, n):
             xpp = x0.copy(); xpp[i] += eps; xpp[j] += eps
             xpm = x0.copy(); xpm[i] += eps; xpm[j] -= eps
             xmp = x0.copy(); xmp[i] -= eps; xmp[j] += eps
             xmm = x0.copy(); xmm[i] -= eps; xmm[j] -= eps
-            H[i, j] = (fun(xpp) - fun(xpm) - fun(xmp) + fun(xmm)) / (4 * eps * eps)
+            H[i, j] = (fun(*xpp) - fun(*xpm) - fun(*xmp) + fun(*xmm)) / (4 * eps * eps)
             H[j, i] = H[i, j]
     return H
 
 
 def test_hessian_findiff_5(benchmark):
-    f = _make_hessian_fun(5)
+    f = _make_hessian_raw(5)
     x0 = list(range(1, 6))
     benchmark(lambda: _hessian_findiff(f, x0))
 
 
 def test_hessian_findiff_10(benchmark):
-    f = _make_hessian_fun(10)
+    f = _make_hessian_raw(10)
     x0 = list(range(1, 11))
     benchmark(lambda: _hessian_findiff(f, x0))
 
 
 def test_hessian_findiff_20(benchmark):
-    f = _make_hessian_fun(20)
+    f = _make_hessian_raw(20)
     x0 = list(range(1, 21))
     benchmark(lambda: _hessian_findiff(f, x0))
