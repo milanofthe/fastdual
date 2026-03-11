@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[test,benchmark]"
+        run: pip install -e ".[test,benchmark]" matplotlib
 
       - name: Run benchmarks and patch README
         run: python scripts/update_readme_benchmarks.py
@@ -29,8 +29,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet README.md || {
-            git add README.md
+          git diff --quiet README.md assets/ || {
+            git add README.md assets/
             git commit -m "Update README benchmark results [skip ci]"
             git push
           }

@@ -51,8 +51,6 @@ OVERHEAD_BENCHMARKS = {
     "sin": {"dual": "test_sin", "float": "test_float_sin"},
     "exp": {"dual": "test_exp", "float": "test_float_exp"},
     "log": {"dual": "test_log", "float": "test_float_log"},
-    "np.sin (10)": {"dual": "test_np_sin_array_10", "float": "test_float_np_sin_array_10"},
-    "np.sin (100)": {"dual": "test_np_sin_array_100", "float": "test_float_np_sin_array_100"},
 }
 
 HDOVERHEAD_BENCHMARKS = {
@@ -224,6 +222,10 @@ def main():
 
     print("Patching README.md...")
     patch_readme(times)
+
+    print("Generating charts...")
+    from generate_charts import generate_charts
+    generate_charts(times)
 
     # Cleanup
     BENCH_JSON.unlink(missing_ok=True)
