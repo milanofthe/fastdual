@@ -13,10 +13,8 @@ import functools
 import warnings
 import numpy as np
 
-from ._optimize import minimize
 from ._hyperdual import HyperDual
 from ._hessian import autohess
-from ._coloring import sparse_jac
 
 
 # ---------------------------------------------------------------------------

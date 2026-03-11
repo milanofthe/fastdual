@@ -86,44 +86,6 @@ result, H = rosenbrock(1.0, 1.0)
 #      [-400, 200]]
 ```
 
-## Optimization
-
-Automatic gradient computation for `scipy.optimize.minimize`:
-
-```python
-from fastdual import minimize
-
-def objective(x):
-    return (x[0] - 1)**2 + 100 * (x[1] - x[0]**2)**2
-
-result = minimize(objective, [0.0, 0.0])
-print(result.x)  # [1.0, 1.0]
-```
-
-Pass `hess=True` for exact Hessians via hyper-dual numbers, enabling second-order
-methods (`trust-ncg`, `Newton-CG`, etc.) that converge in fewer iterations:
-
-```python
-result = minimize(objective, [0.0, 0.0], hess=True)
-```
-
-Requires `pip install fastdual[optimize]`.
-
-## Sparse Jacobians
-
-For large systems with known sparsity, avoid redundant computation via graph coloring:
-
-```python
-from fastdual import sparse_jac
-import numpy as np
-
-def f(x):
-    return np.array([x[i-1] + x[i] + x[i+1] for i in range(1, len(x)-1)])
-
-sparsity = ...  # boolean (m, n) array of known nonzero entries
-J = sparse_jac(f, x0, sparsity)  # only n_colors << n forward passes
-```
-
 ## NumPy Integration
 
 `DualArray` supports `__array_ufunc__` and `__array_function__` protocols:
@@ -228,11 +190,9 @@ These are available via NumPy ufuncs on `Dual`/`DualArray`.
 | `der(result, wrt)` | Partial derivative of result w.r.t. a seed |
 | `val(array)` | Extract primal values from Dual array |
 | `jac(results, seeds)` | Full Jacobian matrix |
-| `autojac(fn)` | Decorator: `fn(*floats) -> (values, jacobian)` |
+| `@autojac` | Decorator: `fn(*floats) -> (values, jacobian)` |
 | `HyperDual(f, f1, f2, f12)` | Hyper-dual number for second derivatives |
-| `@autohess` | Decorator returning `(result, hessian)` via hyper-dual numbers |
-| `minimize(fn, x0)` | scipy.optimize with automatic gradients |
-| `sparse_jac(fn, x, sparsity)` | Sparse Jacobian via graph coloring |
+| `@autohess` | Decorator: `fn(*floats) -> (result, hessian)` via hyper-dual numbers |
 | `reset()` | Reset variable ID counter |
 
 ## Performance

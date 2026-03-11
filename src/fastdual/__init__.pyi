@@ -9,9 +9,6 @@ from ._fastdual import Dual as Dual
 from ._fastdual import reset as reset
 from ._hyperdual import HyperDual as HyperDual
 from ._hessian import autohess as autohess
-from ._optimize import minimize as minimize
-from ._coloring import sparse_jac as sparse_jac
-
 _F = TypeVar("_F", bound=Callable[..., Any])
 
 
