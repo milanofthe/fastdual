@@ -15,7 +15,10 @@ class Dual:
     real: "Dual"
     imag: "Dual"
 
-    def __init__(self, value: float, seed: bool = True) -> None: ...
+    def __init__(self, value: float) -> None: ...
+
+    @classmethod
+    def from_array(cls, values: list[float] | tuple[float, ...]) -> list["Dual"]: ...
 
     # Arithmetic
     def __add__(self, other: "Dual | float | int") -> "Dual": ...
@@ -103,10 +106,6 @@ def reset() -> None:
     """Reset the global variable ID counter."""
     ...
 
-def seed_array(values: list[float]) -> list[Dual]:
-    """Create independent seed Duals from a list of floats (C-level)."""
-    ...
-
 def val_array(duals: list[Dual | float]) -> list[float]:
     """Extract primal values from a list of Duals."""
     ...
@@ -119,18 +118,4 @@ def jac_matrix(
     results: list[Dual | float], seeds: list[Dual]
 ) -> tuple[list[float], int, int]:
     """Compute Jacobian in C. Returns (flat_list, n_rows, n_cols)."""
-    ...
-
-def apply_unary_array(
-    name: str, arr: npt.NDArray[Any]
-) -> npt.NDArray[Any] | None:
-    """Apply a unary ufunc to an object array of Duals."""
-    ...
-
-def apply_binary_array(
-    name: str,
-    lhs: npt.NDArray[Any] | Dual | float,
-    rhs: npt.NDArray[Any] | Dual | float,
-) -> npt.NDArray[Any] | None:
-    """Apply a binary ufunc to arrays/scalars of Duals."""
     ...

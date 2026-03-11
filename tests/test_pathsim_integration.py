@@ -12,7 +12,7 @@ import pytest
 import math
 import numpy as np
 
-from fastdual import Dual, DualArray, val, jac, der, autojac, reset
+from fastdual import Dual, val, jac, der, autojac, reset
 
 # Try importing pathsim's numerical differentiation
 pathsim = pytest.importorskip("pathsim")
@@ -32,8 +32,11 @@ def dual_jac(func, x):
     Matches the signature of pathsim's num_jac(func, x).
     """
     reset()
-    seeds = DualArray(np.atleast_1d(x))
-    result = np.atleast_1d(func(seeds))
+    x_arr = np.atleast_1d(x)
+    seeds = Dual.from_array(x_arr.tolist())
+    # For scalar functions, pass a single Dual; for vector, pass the list
+    inp = seeds[0] if len(seeds) == 1 else seeds
+    result = np.atleast_1d(func(inp))
     return jac(result, seeds)
 
 
@@ -387,7 +390,7 @@ class TestPerformance:
         x0 = np.arange(1.0, n + 1.0)
 
         J_dual = dual_jac(coupled, x0)
-        J_num = num_jac(lambda x: np.array([float(v) for v in coupled(DualArray(x0)).flat], dtype=float).reshape(-1) if False else coupled(x), x0)
+        J_num = num_jac(lambda x: np.array([float(v) for v in coupled(Dual.from_array(x0)).flat], dtype=float).reshape(-1) if False else coupled(x), x0)
 
         # Build analytical Jacobian
         J_exact = np.zeros((n, n))

@@ -1,6 +1,6 @@
 import pytest
 import math
-from fastdual import Dual, reset
+from fastdual import Dual, der, reset
 
 
 @pytest.fixture(autouse=True)
@@ -161,11 +161,12 @@ class TestEdgeCases:
         with pytest.raises(ZeroDivisionError):
             1.0 / y
 
-    def test_constant_dual(self):
-        c = Dual(7.0, seed=False)
-        assert c.val == 7.0
-        assert c.var_id == -1
-        assert c.grad == {}
+    def test_constant_is_just_float(self):
+        # Constants don't need to be Duals — just use plain floats
+        x = Dual(3.0)
+        z = x + 7.0
+        assert z.val == 10.0
+        assert der(z, x) == 1.0
 
     def test_repr(self):
         x = Dual(3.5)

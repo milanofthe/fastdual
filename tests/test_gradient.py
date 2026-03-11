@@ -1,6 +1,6 @@
 import pytest
 import math
-from fastdual import Dual, DualArray, der, jac, val, reset
+from fastdual import Dual, der, jac, val, reset
 import numpy as np
 
 
@@ -70,9 +70,10 @@ class TestMultiSeed:
 
 
 class TestSparsity:
-    def test_constant_has_no_grad(self):
-        c = Dual(7.0, seed=False)
-        assert len(c.grad) == 0
+    def test_float_has_no_grad_effect(self):
+        x = Dual(3.0)
+        z = x + 7.0
+        assert len(z.grad) == 1
 
     def test_add_constant_preserves_sparsity(self):
         x = Dual(3.0)
@@ -103,11 +104,10 @@ class TestDerFunction:
         x = Dual(2.0)
         assert der(3.14, x) == 0.0
 
-    def test_constant_wrt(self):
+    def test_float_wrt(self):
         x = Dual(2.0)
-        c = Dual(5.0, seed=False)
-        z = x * c
-        assert der(z, c) == 0.0
+        z = x * 5.0
+        assert der(z, x) == pytest.approx(5.0)
 
     def test_array(self):
         x = Dual(2.0)
@@ -140,16 +140,16 @@ class TestJacobian:
         np.testing.assert_allclose(J, expected)
 
 
-class TestDualArraySeeding:
+class TestSeeding:
     def test_creates_independent_seeds(self):
-        arr = DualArray([1.0, 2.0, 3.0])
+        arr = Dual.from_array([1.0, 2.0, 3.0])
         assert len(arr) == 3
         for d in arr:
             assert isinstance(d, Dual)
             assert d.var_id >= 0
 
     def test_seeds_are_independent(self):
-        arr = DualArray([1.0, 2.0])
+        arr = Dual.from_array([1.0, 2.0])
         assert der(arr[0], arr[1]) == 0.0
         assert der(arr[1], arr[0]) == 0.0
         assert der(arr[0], arr[0]) == 1.0
@@ -157,7 +157,7 @@ class TestDualArraySeeding:
 
 class TestValFunction:
     def test_extracts_values(self):
-        arr = DualArray([1.0, 2.0, 3.0])
+        arr = Dual.from_array([1.0, 2.0, 3.0])
         v = val(arr)
         np.testing.assert_allclose(v, [1.0, 2.0, 3.0])
 

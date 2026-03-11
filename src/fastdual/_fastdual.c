@@ -248,22 +248,16 @@ static int as_double(PyObject *obj, double *out) {
 /* ---- tp slots ---- */
 
 static int Dual_init(PyDualObject *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"value", "seed", NULL};
+    static char *kwlist[] = {"value", NULL};
     double value = 0.0;
-    int seed = 1;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "d|p", kwlist, &value, &seed))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "d", kwlist, &value))
         return -1;
 
     self->val = value;
     sg_dealloc(&self->grad);
-    if (seed) {
-        sg_init_seed(&self->grad);
-        self->var_id = self->grad.ids[0];
-    } else {
-        sg_init(&self->grad);
-        self->var_id = -1;
-    }
+    sg_init_seed(&self->grad);
+    self->var_id = self->grad.ids[0];
     return 0;
 }
 
@@ -945,6 +939,35 @@ static PyObject *Dual_array_ufunc(PyDualObject *self, PyObject *args, PyObject *
 
 /* ---- Method table ---- */
 
+/* from_array(values) -> list of seed Duals (classmethod) */
+static PyObject *Dual_from_array(PyObject *cls, PyObject *arg) {
+    (void)cls;
+    PyObject *seq = PySequence_Fast(arg, "from_array expects a sequence");
+    if (!seq) return NULL;
+
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+    PyObject *result = PyList_New(n);
+    if (!result) { Py_DECREF(seq); return NULL; }
+
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyObject *item = PySequence_Fast_GET_ITEM(seq, i);  /* borrowed */
+        double v = PyFloat_AsDouble(item);
+        if (v == -1.0 && PyErr_Occurred()) {
+            Py_DECREF(result);
+            Py_DECREF(seq);
+            return NULL;
+        }
+        PyDualObject *d = (PyDualObject *)PyDual_Type.tp_alloc(&PyDual_Type, 0);
+        if (!d) { Py_DECREF(result); Py_DECREF(seq); return NULL; }
+        d->val = v;
+        sg_init_seed(&d->grad);
+        d->var_id = d->grad.ids[0];
+        PyList_SET_ITEM(result, i, (PyObject *)d);  /* steals ref */
+    }
+    Py_DECREF(seq);
+    return result;
+}
+
 static PyMethodDef Dual_methods[] = {
     {"sin",       (PyCFunction)Dual_sin,       METH_NOARGS,  "sin(self)"},
     {"cos",       (PyCFunction)Dual_cos,       METH_NOARGS,  "cos(self)"},
@@ -985,6 +1008,8 @@ static PyMethodDef Dual_methods[] = {
     {"floor",       (PyCFunction)Dual_floor,    METH_NOARGS,  "floor(self)"},
     {"ceil",        (PyCFunction)Dual_ceil,     METH_NOARGS,  "ceil(self)"},
     {"fabs",        (PyCFunction)Dual_m_abs,    METH_NOARGS,  "fabs(self)"},
+    {"from_array",  (PyCFunction)Dual_from_array, METH_O | METH_CLASS,
+     "Create a list of independent seed Duals from a sequence of floats"},
     {NULL}
 };
 

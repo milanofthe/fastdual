@@ -40,15 +40,15 @@ print(der(z, x))    # 5.99 (dz/dx = y + cos(x))
 print(der(z, y))    # 3.0  (dz/dy = x)
 ```
 
-## Array Operations
+## Multiple Variables
 
 ```python
-from fastdual import DualArray, val, jac
+from fastdual import Dual, der, val, jac
 import numpy as np
 
-xs = DualArray([1.0, 2.0, 3.0])  # independent seeds
+xs = Dual.from_array([1.0, 2.0, 3.0])  # list of independent seeds
 
-result = np.sin(xs) + xs ** 2
+result = [np.sin(x) + x ** 2 for x in xs]
 print(val(result))     # [sin(1)+1, sin(2)+4, sin(3)+9]
 print(jac(result, xs)) # diagonal Jacobian
 ```
@@ -88,19 +88,15 @@ result, H = rosenbrock(1.0, 1.0)
 
 ## NumPy Integration
 
-`DualArray` supports `__array_ufunc__` and `__array_function__` protocols:
+Scalar `Dual` numbers work with NumPy ufuncs via `__array_ufunc__`:
 
 ```python
-from fastdual import DualArray
+from fastdual import Dual, der
 import numpy as np
 
-x = DualArray([1.0, 2.0, 3.0])
-
-np.sin(x)              # ufuncs
-np.dot(x, x)           # dot product
-np.sum(x)              # reduction
-np.linalg.norm(x)      # L2 norm
-np.linalg.solve(A, b)  # linear solve with gradient propagation
+x = Dual(1.0)
+np.sin(x)    # returns Dual with correct derivative
+np.exp(x)    # all standard ufuncs supported
 ```
 
 ## Supported Operations
@@ -123,7 +119,7 @@ Both `Dual` (first-order) and `HyperDual` (second-order) types are C extensions.
 
 ### Transcendental Functions
 
-Available as methods (`.sin()`) on both types and via NumPy ufuncs (`np.sin()`) on `Dual`/`DualArray`.
+Available as methods (`.sin()`) on both types and via NumPy ufuncs (`np.sin()`) on `Dual`.
 
 | Function | Method | Derivative |
 |----------|--------|------------|
@@ -152,7 +148,7 @@ Available as methods (`.sin()`) on both types and via NumPy ufuncs (`np.sin()`) 
 
 ### Binary Functions (Dual only)
 
-These are available via NumPy ufuncs on `Dual`/`DualArray`.
+These are available via NumPy ufuncs on `Dual`.
 
 | Function | Usage | Description |
 |----------|-------|-------------|
@@ -185,8 +181,7 @@ These are available via NumPy ufuncs on `Dual`/`DualArray`.
 | Function | Description |
 |----------|-------------|
 | `Dual(value)` | Create an independent variable (seed) |
-| `Dual(value, seed=False)` | Create a constant (no gradient) |
-| `DualArray(values)` | Array of independent seeds from numeric input |
+| `Dual.from_array(values)` | Create a list of independent seeds from floats |
 | `der(result, wrt)` | Partial derivative of result w.r.t. a seed |
 | `val(array)` | Extract primal values from Dual array |
 | `jac(results, seeds)` | Full Jacobian matrix |
@@ -210,8 +205,6 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 | sin | 148 ns | 117 ns | 1.3x |
 | exp | 155 ns | 120 ns | 1.3x |
 | log | 138 ns | 115 ns | 1.2x |
-| np.sin (10) | 2.5 us | 842 ns | 3.0x |
-| np.sin (100) | 6.8 us | 1.8 us | 3.8x |
 <!-- BENCH:OVERHEAD:END -->
 
 ### HyperDual: overhead vs plain floats
