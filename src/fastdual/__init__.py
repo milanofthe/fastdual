@@ -2,7 +2,7 @@ from importlib.metadata import version as _pkg_version
 
 __version__ = _pkg_version("fastdual")
 
-from ._fastdual import Dual, reset
+from ._fastdual import Dual
 from ._fastdual import val_array as _c_val_array
 from ._fastdual import der_array as _c_der_array
 from ._fastdual import jac_matrix as _c_jac_matrix

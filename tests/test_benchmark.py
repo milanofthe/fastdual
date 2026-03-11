@@ -13,7 +13,8 @@ except ImportError:
     pass
 
 import pytest
-from fastdual import Dual, HyperDual, der, jac, val, autohess, reset
+from fastdual import Dual, HyperDual, der, jac, val, autohess
+from fastdual._fastdual import reset
 
 
 pytestmark = pytest.mark.skipif(

@@ -1,7 +1,8 @@
 import pytest
 import math
 import numpy as np
-from fastdual import Dual, der, val, reset, autojac
+from fastdual import Dual, der, val, autojac
+from fastdual._fastdual import reset
 
 
 @pytest.fixture(autouse=True)

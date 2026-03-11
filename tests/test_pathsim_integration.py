@@ -12,7 +12,8 @@ import pytest
 import math
 import numpy as np
 
-from fastdual import Dual, val, jac, der, autojac, reset
+from fastdual import Dual, val, jac, der, autojac
+from fastdual._fastdual import reset
 
 # Try importing pathsim's numerical differentiation
 pathsim = pytest.importorskip("pathsim")

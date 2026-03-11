@@ -6,7 +6,6 @@ import numpy as np
 import numpy.typing as npt
 
 from ._fastdual import Dual as Dual
-from ._fastdual import reset as reset
 from ._hyperdual import HyperDual as HyperDual
 from ._hessian import autohess as autohess
 

@@ -1,6 +1,7 @@
 import pytest
 import math
-from fastdual import Dual, der, jac, val, reset
+from fastdual import Dual, der, jac, val
+from fastdual._fastdual import reset
 import numpy as np
 
 

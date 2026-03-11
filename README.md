@@ -188,7 +188,6 @@ These are available via NumPy ufuncs on `Dual`.
 | `@autojac` | Decorator: `fn(*floats) -> (values, jacobian)` |
 | `HyperDual(f, f1, f2, f12)` | Hyper-dual number for second derivatives |
 | `@autohess` | Decorator: `fn(*floats) -> (result, hessian)` via hyper-dual numbers |
-| `reset()` | Reset variable ID counter |
 
 ## Performance
 
