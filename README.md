@@ -195,6 +195,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 
 ### Dual: overhead vs plain floats
 
+![Dual vs float overhead](assets/bench_dual_overhead.png)
+
 <!-- BENCH:OVERHEAD:START -->
 | Operation | Dual | float | overhead |
 |-----------|------|-------|----------|
@@ -207,6 +209,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 <!-- BENCH:OVERHEAD:END -->
 
 ### HyperDual: overhead vs plain floats
+
+![HyperDual vs float overhead](assets/bench_hyperdual_overhead.png)
 
 <!-- BENCH:HDOVERHEAD:START -->
 | Operation | HyperDual | float | overhead |
@@ -221,6 +225,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 
 ### Jacobian: fastdual vs finite differences
 
+![Jacobian benchmark](assets/bench_jacobian.png)
+
 <!-- BENCH:COMPARISON:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
 |-----------|---|---|---|
@@ -231,6 +237,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 > Jacobians use the C extension for forward-mode AD — one pass computes all partials simultaneously, vs n+1 function evaluations for finite differences.
 
 ### Hessian: fastdual vs finite differences
+
+![Hessian benchmark](assets/bench_hessian.png)
 
 <!-- BENCH:HESSIAN:START -->
 | Benchmark | fastdual | fin. diff. | speedup |
@@ -245,6 +253,8 @@ All hot paths are in C — both `Dual` and `HyperDual` types are C extensions wi
 ### Gradient vs Hessian
 
 How much more does a Hessian cost compared to a gradient for the same function?
+
+![Gradient vs Hessian](assets/bench_grad_vs_hess.png)
 
 <!-- BENCH:GRADVSHESS:START -->
 | Size | Gradient (Dual) | Hessian (HyperDual) | ratio |
